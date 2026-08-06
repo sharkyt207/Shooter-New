@@ -72,25 +72,30 @@ try {
   await page.goto(URL_TARGET, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
 
-  console.log('  1/6 Hauptmenü');
+  console.log('  1/7 Hauptmenü');
   await shot('01-menu');
   await clickButton('Riss betreten');
 
-  console.log('  2/6 Basis');
+  console.log('  2/7 Basis');
   await shot('02-base');
   await clickButton('Ausrüstung wählen');
 
-  console.log('  3/6 Ausrüstung');
+  console.log('  3/7 Ausrüstung');
   await shot('03-loadout');
+
+  console.log('  4/7 Werkstatt');
+  await clickButton('Werkstatt öffnen');
+  await shot('04-workshop');
+  await clickButton('Zurück');
   await clickButton('Riss betreten');
 
-  console.log('  4/6 Briefing');
-  await shot('04-briefing');
+  console.log('  5/7 Briefing');
+  await shot('05-briefing');
   await clickButton('Riss betreten');
   await page.waitForTimeout(1800);
 
-  console.log('  5/6 Raid');
-  await shot('05-raid');
+  console.log('  6/7 Raid');
+  await shot('06-raid');
 
   // Exercise simulation and renderer together: move, aim, fire.
   await page.keyboard.down('KeyD');
@@ -99,13 +104,15 @@ try {
   await page.waitForTimeout(1600);
   await page.mouse.up();
   await page.keyboard.up('KeyD');
+  // Melee and the M2 action buttons share the same input path as firing.
+  await page.keyboard.press('KeyF');
   await page.waitForTimeout(400);
-  await shot('06-raid-action');
+  await shot('07-raid-action');
 
-  console.log('  6/6 Inventar');
+  console.log('  7/7 Inventar');
   await page.keyboard.press('Tab');
   await page.waitForTimeout(500);
-  await shot('07-inventory');
+  await shot('08-inventory');
 
   const frames = await page.evaluate(
     () =>

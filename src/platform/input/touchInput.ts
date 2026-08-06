@@ -44,7 +44,7 @@ export class TouchInput implements InputSource {
   private moveStick: ActiveStick | null = null;
   private aimStick: ActiveStick | null = null;
   private buttons = { fire: false, reload: false, interact: false, sprint: false };
-  private oneShots = { toggleInventory: false, pause: false };
+  private oneShots = { toggleInventory: false, pause: false, melee: false };
 
   private readonly visuals: TouchVisuals = {
     move: { active: false, originX: 0, originY: 0, knobX: 0, knobY: 0 },
@@ -114,6 +114,7 @@ export class TouchInput implements InputSource {
     out.interact = this.buttons.interact;
     out.toggleInventory = this.oneShots.toggleInventory;
     out.pause = this.oneShots.pause;
+    out.melee = this.oneShots.melee;
 
     return out;
   }
@@ -121,6 +122,7 @@ export class TouchInput implements InputSource {
   endFrame(): void {
     this.oneShots.toggleInventory = false;
     this.oneShots.pause = false;
+    this.oneShots.melee = false;
     // Reload is a tap, not a hold.
     this.buttons.reload = false;
   }

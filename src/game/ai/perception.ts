@@ -37,6 +37,14 @@ export function perceptionSystem(ctx: SimContext): void {
     agent.timeSinceSeen += dt;
     agent.perceptionTimer -= dt;
 
+    // A flashbanged enemy perceives nothing at all. That is what makes the
+    // flash an escape tool rather than a weaker grenade.
+    if (world.disoriented.has(entity)) {
+      agent.awareness = 0;
+      agent.target = null;
+      continue;
+    }
+
     // Hearing is cheap and time-critical (a gunshot must register immediately),
     // so it is checked every tick regardless of the stagger.
     checkHearing(ctx, entity, agent);

@@ -32,6 +32,8 @@ export interface PlayerProfile {
   loadout: Loadout;
   /** Base module id -> current level. A missing key means "not built". */
   modules: Record<string, number>;
+  /** How often the equipped weapon has been serviced; each repair lowers its ceiling. */
+  weaponRepairs: number;
   stats: RaidStats;
 }
 
@@ -58,7 +60,11 @@ export function createDefaultProfile(): PlayerProfile {
   const loadout: Loadout = {
     weaponItemId: 'itm_wpn_splitter',
     armorItemId: 'itm_armor_fiber',
+    helmetItemId: null,
     backpackItemId: 'itm_bag_small',
+    attachments: {},
+    preferredAmmoItemId: 'itm_ammo_9mm',
+    weaponCondition: 1,
     carried: [
       { itemId: 'itm_ammo_9mm', quantity: 60 },
       { itemId: 'itm_bandage', quantity: 2 },
@@ -73,6 +79,7 @@ export function createDefaultProfile(): PlayerProfile {
     stash,
     loadout,
     modules,
+    weaponRepairs: 0,
     stats: {
       raidsStarted: 0,
       extractions: 0,

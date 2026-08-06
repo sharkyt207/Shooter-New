@@ -526,6 +526,21 @@ export class WorldRenderer {
     );
 
     this.unsubscribes.push(
+      sim.bus.on('throwable:detonated', (event) => {
+        // Scale the flash with the blast so a frag reads bigger than a lure.
+        this.spawnVfx('fx.impact.wall', event.x, event.y, 0.45, 0.4, event.radius * 0.9);
+        if (event.kind === 'frag') this.camera.addShake(0.8);
+        if (event.kind === 'flash') this.camera.addShake(0.45);
+      }),
+    );
+
+    this.unsubscribes.push(
+      sim.bus.on('melee:swing', (event) => {
+        this.spawnVfx('fx.muzzleflash', event.x, event.y, 0.14, 0.3, 0.6);
+      }),
+    );
+
+    this.unsubscribes.push(
       sim.bus.on('camera:shake', (event) => this.camera.addShake(event.intensity)),
     );
   }

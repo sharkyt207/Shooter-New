@@ -13,6 +13,9 @@ import { createDefaultProfile, stashCapacityFor, type PlayerProfile } from '@/ga
 import { compact, createInventory } from '@/game/inventory/inventory';
 import { createEmptyLoadout } from '@/game/player/loadout';
 import { findItem } from '@/content/items';
+import { findAttachment } from '@/content/attachments';
+import type { AttachmentLoadout } from '@/content/types';
+import { clamp01 } from '@/core/math/scalar';
 
 export const CURRENT_SAVE_VERSION = 1;
 
@@ -117,6 +120,7 @@ function validateProfile(input: unknown, notes: string[]): PlayerProfile {
     level: numberOr(raw.level, 1),
     echoShards: numberOr(raw.echoShards, 0),
     modules: sanitizeModules(raw.modules, fallback.modules),
+    weaponRepairs: Math.max(0, Math.floor(numberOr(raw.weaponRepairs, 0))),
     stash: fallback.stash,
     loadout: fallback.loadout,
     stats: {
@@ -139,7 +143,11 @@ function validateProfile(input: unknown, notes: string[]): PlayerProfile {
   const loadout = createEmptyLoadout();
   loadout.weaponItemId = sanitizeItemId(raw.loadout?.weaponItemId);
   loadout.armorItemId = sanitizeItemId(raw.loadout?.armorItemId);
+  loadout.helmetItemId = sanitizeItemId(raw.loadout?.helmetItemId);
   loadout.backpackItemId = sanitizeItemId(raw.loadout?.backpackItemId);
+  loadout.preferredAmmoItemId = sanitizeItemId(raw.loadout?.preferredAmmoItemId);
+  loadout.weaponCondition = clamp01(numberOr(raw.loadout?.weaponCondition, 1));
+  loadout.attachments = sanitizeAttachments(raw.loadout?.attachments);
   loadout.carried = sanitizeSlots(raw.loadout?.carried, notes);
   profile.loadout = loadout;
 
@@ -176,6 +184,23 @@ function sanitizeSlots(
   }
 
   if (dropped > 0) notes.push(`${dropped} unbekannte Gegenstände wurden entfernt.`);
+  return result;
+}
+
+/**
+ * Drop attachments that no longer exist or moved slot.
+ * A content change must never make a save unloadable.
+ */
+function sanitizeAttachments(value: unknown): AttachmentLoadout {
+  if (!value || typeof value !== 'object') return {};
+
+  const result: AttachmentLoadout = {};
+  for (const [slot, attachmentId] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof attachmentId !== 'string') continue;
+    const def = findAttachment(attachmentId);
+    if (!def || def.slot !== slot) continue;
+    result[def.slot] = attachmentId;
+  }
   return result;
 }
 

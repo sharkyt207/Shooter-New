@@ -19,6 +19,8 @@ export interface HudCallbacks {
   onInventory(): void;
   onPause(): void;
   onUseItem(itemId: string): void;
+  onThrowItem(itemId: string): void;
+  onMelee(): void;
 }
 
 export class Hud {
@@ -39,6 +41,7 @@ export class Hud {
   private readonly banner: HTMLElement;
   private readonly vignette: HTMLElement;
   private readonly quickUse: HTMLElement;
+  private readonly throwables: HTMLElement;
   private readonly moveStick: HTMLElement;
   private readonly moveKnob: HTMLElement;
   private readonly aimStick: HTMLElement;
@@ -54,6 +57,7 @@ export class Hud {
     timerText: '',
     contextLabel: '',
     quickUseKey: '',
+    throwKey: '',
   };
 
   private bannerTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -92,6 +96,10 @@ export class Hud {
 
     this.vignette = el('div', { className: 'hud__vignette' });
     this.quickUse = el('div', { className: 'hud__buttons' });
+    this.throwables = el('div', {
+      className: 'hud__buttons hud__buttons--throw',
+      style: { right: 'calc(var(--safe-right) + 148px)' },
+    });
 
     this.moveKnob = el('div', { className: 'stick__knob' });
     this.moveStick = el('div', { className: 'stick stick--move', children: [this.moveKnob] });
@@ -144,6 +152,7 @@ export class Hud {
         this.ammo,
         this.buildControls(),
         this.quickUse,
+        this.throwables,
         this.moveStick,
         this.aimStick,
         this.vignette,
@@ -173,6 +182,13 @@ export class Hud {
           text: 'Sprint',
           onHold: (pressed) => this.touch.setButton('sprint', pressed),
         }),
+        el('button', {
+          className: 'hud__btn hud__btn--melee',
+          text: 'Nah',
+          attrs: { 'aria-label': 'Nahkampf' },
+          data: { uiControl: 'true' },
+          onClick: () => this.callbacks.onMelee(),
+        }),
       ],
     });
   }
@@ -185,6 +201,7 @@ export class Hud {
     this.updateContext(vm);
     this.updateExtraction(vm);
     this.updateQuickUse(vm);
+    this.updateThrowables(vm);
     this.updateSticks();
     this.minimap.update(vm, grid);
   }
@@ -215,21 +232,42 @@ export class Hud {
   }
 
   private updateAmmo(vm: HudViewModel): void {
-    const text = vm.reloading
-      ? `${Math.round(vm.reloadProgress * 100)}%`
-      : `${vm.magazine} / ${vm.reserveAmmo}`;
+    const text = vm.jammed
+      ? 'jam'
+      : vm.reloading
+        ? `${Math.round(vm.reloadProgress * 100)}%`
+        : `${vm.magazine} / ${vm.reserveAmmo} ${vm.ammoName ?? ''}`;
     if (text === this.last.ammoText) return;
     this.last.ammoText = text;
 
     clear(this.ammo);
+
+    // A jam is the single most urgent thing on screen when it happens: the
+    // weapon simply will not fire until it is cleared.
+    if (vm.jammed) {
+      this.ammo.appendChild(el('span', { className: 'is-empty', text: 'LADEHEMMUNG' }));
+      return;
+    }
     if (vm.reloading) {
       this.ammo.appendChild(el('span', { className: 'subtitle', text: `Nachladen ${text}` }));
       return;
     }
+
     this.ammo.appendChild(
       el('span', { className: vm.magazine === 0 ? 'is-empty' : '', text: String(vm.magazine) }),
     );
     this.ammo.appendChild(el('small', { text: ` / ${vm.reserveAmmo}` }));
+    if (vm.ammoName) {
+      this.ammo.appendChild(el('small', { text: ` · ${vm.ammoName}` }));
+    }
+    if (vm.weaponCondition < 0.55) {
+      this.ammo.appendChild(
+        el('small', {
+          style: { color: vm.weaponCondition < 0.3 ? 'var(--color-danger)' : 'var(--color-threat)' },
+          text: ` · Zustand ${Math.round(vm.weaponCondition * 100)} %`,
+        }),
+      );
+    }
   }
 
   private updateTimer(vm: HudViewModel): void {
@@ -278,6 +316,24 @@ export class Hud {
           text: `${shortName(item.name)}\n${item.quantity}`,
           data: { uiControl: 'true' },
           onClick: () => this.callbacks.onUseItem(item.itemId),
+        }),
+      );
+    }
+  }
+
+  private updateThrowables(vm: HudViewModel): void {
+    const key = vm.throwables.map((item) => `${item.itemId}:${item.quantity}`).join('|');
+    if (key === this.last.throwKey) return;
+    this.last.throwKey = key;
+
+    clear(this.throwables);
+    for (const item of vm.throwables.slice(0, 3)) {
+      this.throwables.appendChild(
+        el('button', {
+          className: 'hud__btn hud__btn--throw',
+          text: `${shortName(item.name)}\n${item.quantity}`,
+          data: { uiControl: 'true' },
+          onClick: () => this.callbacks.onThrowItem(item.itemId),
         }),
       );
     }
@@ -333,6 +389,13 @@ function applyStick(
   knob.style.transform = `translate(${visual.knobX}px, ${visual.knobY}px)`;
 }
 
+/**
+ * Fit an item name onto a 52-58 px round button.
+ *
+ * Anything longer overflows the circle, and an overflowing HUD button reads as
+ * broken rather than as informative.
+ */
 function shortName(name: string): string {
-  return name.length > 9 ? `${name.slice(0, 8)}.` : name;
+  const firstWord = name.split(/[\s-]/)[0] ?? name;
+  return firstWord.length > 7 ? `${firstWord.slice(0, 6)}.` : firstWord;
 }

@@ -15,6 +15,7 @@ import type {
   Carrier,
   Collider,
   ContainerState,
+  Disoriented,
   Equipment,
   Faction,
   Health,
@@ -24,6 +25,7 @@ import type {
   Projectile,
   Renderable,
   Stamina,
+  Thrown,
   Transform,
   UsingItem,
   Velocity,
@@ -52,6 +54,8 @@ export class RaidWorld extends World {
   readonly carriers: ComponentStore<Carrier>;
   readonly usingItems: ComponentStore<UsingItem>;
   readonly hitFlashes: ComponentStore<HitFlash>;
+  readonly thrown: ComponentStore<Thrown>;
+  readonly disoriented: ComponentStore<Disoriented>;
 
   /** The player entity, or NULL once the player has died. */
   playerEntity: EntityId | null = null;
@@ -77,6 +81,8 @@ export class RaidWorld extends World {
     this.carriers = this.registerStore<Carrier>('carrier');
     this.usingItems = this.registerStore<UsingItem>('usingItem');
     this.hitFlashes = this.registerStore<HitFlash>('hitFlash');
+    this.thrown = this.registerStore<Thrown>('thrown');
+    this.disoriented = this.registerStore<Disoriented>('disoriented');
   }
 
   /** Convenience: does this entity still exist and have health left? */

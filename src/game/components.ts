@@ -10,6 +10,7 @@
  */
 
 import type { EntityId } from '@/core/ecs/entity';
+import type { AttachmentLoadout } from '@/content/types';
 import type { InventoryState } from './inventory/inventory';
 
 export interface Transform {
@@ -65,18 +66,32 @@ export interface WeaponState {
   weaponId: string;
   /** Rounds currently in the magazine. */
   magazine: number;
+  /** Which round is chambered. Null means the weapon's default load. */
+  loadedAmmoItemId: string | null;
   /** Seconds until the weapon may fire again. */
   cooldown: number;
   /** Seconds remaining on the reload, 0 when not reloading. */
   reloadRemaining: number;
   /** Extra spread accumulated from sustained fire, in degrees. */
   bloomDeg: number;
+  /** Remaining durability. Wear widens spread and invites jams. */
+  durability: number;
+  /** Maximum durability, so wear can be expressed as a fraction. */
+  durabilityMax: number;
+  /** Seconds left clearing a jam. Greater than zero means the weapon is dead. */
+  jamRemaining: number;
 }
 
 export interface Projectile {
   owner: EntityId;
   ownerFaction: FactionId;
   damage: number;
+  /** Ammunition properties, carried so the hit can be resolved on impact. */
+  penetration: number;
+  fragmentation: number;
+  fragmentationBonus: number;
+  /** Hit-zone weighting of the weapon that fired this round. */
+  zoneBias: { head: number; torso: number; limbs: number };
   /** Direction, always unit length. */
   dirX: number;
   dirY: number;
@@ -179,9 +194,33 @@ export interface Renderable {
 export interface Equipment {
   weaponItemId: string | null;
   armorItemId: string | null;
+  helmetItemId: string | null;
   backpackItemId: string | null;
-  /** Remaining armor durability; 0 means the armor no longer protects. */
+  /** Remaining armour durability; low values stop far less. */
   armorDurability: number;
+  helmetDurability: number;
+  /** Attachments fitted to the equipped weapon. */
+  attachments: AttachmentLoadout;
+}
+
+/** A thrown object in flight, before it detonates. */
+export interface Thrown {
+  throwableId: string;
+  owner: EntityId;
+  ownerFaction: FactionId;
+  /** Direction, unit length. */
+  dirX: number;
+  dirY: number;
+  speed: number;
+  /** Metres still to travel before the object comes to rest. */
+  remainingDistance: number;
+  /** Seconds until detonation. Counts down in flight and at rest. */
+  fuse: number;
+}
+
+/** Applied by a flashbang: the enemy cannot see or act coherently. */
+export interface Disoriented {
+  remaining: number;
 }
 
 export interface Carrier {

@@ -19,7 +19,129 @@ export type ItemCategory =
   | 'material'
   | 'valuable'
   | 'armor'
-  | 'backpack';
+  | 'backpack'
+  | 'attachment'
+  | 'throwable';
+
+/**
+ * Where a hit lands.
+ *
+ * In an isometric top-down view the player cannot aim at a head deliberately,
+ * so zones are resolved by a weighted roll rather than by geometry. Weapon
+ * class shifts the weights: a marksman rifle finds the head far more often than
+ * a shotgun does. That keeps the genre's "one good shot ends it" tension
+ * without pretending to a precision the camera cannot offer.
+ */
+export type HitZone = 'head' | 'torso' | 'limbs';
+
+/** Ammunition calibres. A weapon accepts any ammo item of its calibre. */
+export type Caliber = 'cal_9mm' | 'cal_74' | 'cal_12';
+
+/**
+ * Ammunition behaviour.
+ *
+ * Penetration is compared against the target's armour class: the same rifle
+ * becomes a different weapon depending on what is loaded. This is the core of
+ * M2 - a shot is no longer just "damage".
+ */
+export interface AmmoStats {
+  caliber: Caliber;
+  /** Multiplier on the weapon's base damage. */
+  damageMultiplier: number;
+  /** 0..100, compared against effective armour class. */
+  penetration: number;
+  /** 0..1 chance of extra damage when the round meets no armour. */
+  fragmentation: number;
+  /** Bonus damage factor applied when a round fragments. */
+  fragmentationBonus: number;
+  /** Multiplier on projectile speed. */
+  speedMultiplier: number;
+  /** Overrides the weapon's pellet count. A slug turns a shotgun into a rifle. */
+  pelletsOverride?: number;
+  /** Multiplier on the weapon's base spread. */
+  spreadMultiplier?: number;
+}
+
+/**
+ * Armour behaviour.
+ *
+ * `armorClass` decides *whether* a round gets through; `reduction` decides how
+ * much is absorbed when it does not. Durability erodes the effective class, so
+ * a battered plate carrier stops progressively less.
+ */
+export interface ArmorStats {
+  /** 1..6. Higher classes stop higher penetration values. */
+  armorClass: number;
+  durability: number;
+  /** Damage reduction 0..1 when the round fails to penetrate. */
+  reduction: number;
+  /** Which hit zones this piece covers. */
+  coverage: readonly HitZone[];
+  /** Movement speed penalty 0..1, applied on top of encumbrance. */
+  speedPenalty: number;
+}
+
+export type AttachmentSlot = 'barrel' | 'sight' | 'magazine' | 'muzzle';
+
+/**
+ * Stat deltas of a weapon attachment.
+ *
+ * Multipliers default to 1, additions to 0 - an omitted field means "changes
+ * nothing", which keeps the data files readable.
+ */
+export interface AttachmentModifiers {
+  spreadDegMult?: number;
+  spreadPerShotDegMult?: number;
+  maxSpreadDegMult?: number;
+  effectiveRangeAdd?: number;
+  maxRangeAdd?: number;
+  projectileSpeedMult?: number;
+  magazineSizeAdd?: number;
+  reloadSecondsMult?: number;
+  noiseRadiusMult?: number;
+  /** Ergonomics: higher recovers spread faster and steadies quicker. */
+  ergonomicsAdd?: number;
+  damageMult?: number;
+  /** Extra kilograms. Attachments are never free. */
+  weightAdd?: number;
+}
+
+/** Attachment ids fitted per slot. A missing slot means "nothing fitted". */
+export type AttachmentLoadout = Partial<Record<AttachmentSlot, string>>;
+
+export interface AttachmentDef {
+  id: string;
+  itemId: string;
+  name: string;
+  slot: AttachmentSlot;
+  /** Weapon ids this attachment fits. Empty means "fits everything". */
+  compatibleWeapons: readonly string[];
+  modifiers: AttachmentModifiers;
+}
+
+export type ThrowableKind = 'frag' | 'flash' | 'lure';
+
+export interface ThrowableDef {
+  id: string;
+  itemId: string;
+  name: string;
+  kind: ThrowableKind;
+  /** Seconds from throw to detonation. */
+  fuseSeconds: number;
+  /** Metres per second the object travels. */
+  throwSpeed: number;
+  /** Maximum throw distance in metres. */
+  throwRange: number;
+  /** Effect radius in metres. */
+  radius: number;
+  /** Damage at the centre, falling off to zero at the edge. Frag only. */
+  damage: number;
+  /** Seconds enemies stay disoriented. Flash only. */
+  disorientSeconds: number;
+  /** Noise radius on detonation - the whole point of the lure. */
+  noiseRadius: number;
+  visual: string;
+}
 
 /** What happens when the player uses a consumable. */
 export interface ConsumableEffect {
@@ -46,8 +168,8 @@ export interface ItemDef {
   /** Logical asset key, resolved through the asset manifest. */
   icon: string;
   consumable?: ConsumableEffect;
-  /** For armor: damage reduction 0..1 and the durability pool. */
-  armor?: { reduction: number; durability: number };
+  armor?: ArmorStats;
+  ammo?: AmmoStats;
   /** For backpacks: how much weight the player can carry with it equipped. */
   capacityKg?: number;
 }
@@ -79,9 +201,22 @@ export interface WeaponDef {
   effectiveRange: number;
   maxRange: number;
   minDamageFactor: number;
-  ammoItemId: string;
+  /** The calibre this weapon chambers. Any ammo item of that calibre fits. */
+  caliber: Caliber;
+  /** Ammo used when nothing better is available (AI, starter loadouts). */
+  defaultAmmoItemId: string;
   /** Metres. Enemies within this radius hear the shot. */
   noiseRadius: number;
+  /** 0..100. Higher recovers spread faster and jams less under wear. */
+  ergonomics: number;
+  /** Full durability pool. Wear reduces accuracy and invites jams. */
+  durabilityMax: number;
+  /** Durability lost per shot. */
+  wearPerShot: number;
+  /** Attachment slots this weapon offers. */
+  slots: readonly AttachmentSlot[];
+  /** Shifts hit-zone weights; a marksman rifle finds the head more often. */
+  zoneBias: { head: number; torso: number; limbs: number };
   visual: string;
 }
 
@@ -108,8 +243,8 @@ export interface EnemyDef {
   /** Multiplier applied to move speed while chasing. */
   chaseSpeedFactor: number;
   radius: number;
-  /** Damage reduction 0..1 from natural armor. */
-  armorReduction: number;
+  /** Natural armour class of the archetype, 0 = unarmoured. */
+  armorClass: number;
   perception: PerceptionDef;
   /** Weapon this archetype fires. */
   weaponId: string;

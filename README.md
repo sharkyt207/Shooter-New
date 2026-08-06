@@ -25,10 +25,12 @@ npm run verify     # Typen + Tests + Architekturgrenzen  ← Qualitäts-Gate
 | `npm test` | Vitest (headless Simulationstests) |
 | `npm run typecheck` | TypeScript strict, ohne Emit |
 | `npm run check:boundaries` | Erzwingt die Architekturregeln |
+| `npm run smoke` | End-to-End-Test im echten Browser (Playwright optional) |
 | `npm run verify` | Alle drei Gates zusammen |
 
 **Steuerung (Desktop):** `WASD` bewegen · Maus zielen · Linksklick/Leertaste feuern ·
-`R` nachladen · `E` interagieren · `Tab` Inventar · `Esc` Pause
+`R` nachladen bzw. Ladehemmung beheben · `F` Nahkampf · `E` interagieren ·
+`Tab` Inventar · `Esc` Pause
 **Steuerung (Touch):** zwei dynamische virtuelle Sticks + Kontextbuttons.
 
 ---
@@ -82,7 +84,7 @@ Laufzeit-Abhängigkeiten: **genau eine** (`pixi.js`). Begründung: [ADR-012](doc
 
 ## Status
 
-**M0 Fundament** ✅ · **M1 Prototyp** ✅ · **M2 Kampf & Waffen** 🔜
+**M0 Fundament** ✅ · **M1 Prototyp** ✅ · **M2 Kampf & Waffen** ✅ · **M3 Gegner & KI** 🔜
 Details: [Roadmap](docs/02-ROADMAP.md)
 
 ---

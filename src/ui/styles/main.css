@@ -465,15 +465,20 @@ body {
 .hud__btn {
   width: 58px;
   height: 58px;
+  padding: 0 2px;
   border-radius: 50%;
   border: 1px solid var(--border-strong);
   background: rgba(18, 22, 31, 0.78);
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
   text-transform: uppercase;
   cursor: pointer;
+  /* A label that spills out of the circle reads as broken, not informative. */
+  overflow: hidden;
+  white-space: pre-line;
 }
 
 .hud__btn:active {
@@ -484,6 +489,26 @@ body {
 .hud__btn--interact {
   border-color: var(--color-threat);
   color: var(--color-threat);
+}
+
+.hud__btn--melee {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.hud__btn--throw {
+  border-color: var(--color-echo);
+  color: var(--color-echo);
+  white-space: pre-line;
+  line-height: 1.1;
+}
+
+/* Throwables sit further from the thumb than the core actions: they are a
+   deliberate choice, not a reflex. */
+.hud__buttons--throw .hud__btn {
+  width: 52px;
+  height: 52px;
+  font-size: 0.62rem;
 }
 
 .hud__topright {

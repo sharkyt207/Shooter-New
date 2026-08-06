@@ -14,9 +14,11 @@ import { findItem } from '@/content/items';
 import { findWeapon } from '@/content/weapons';
 import type { EntityId } from '@/core/ecs/entity';
 import type { AnomalyKind, FactionId } from '@/game/components';
+import type { ResolvedWeapon } from '@/game/weapons/weaponStats';
 import { addItem, createInventory } from '@/game/inventory/inventory';
 import type { Loadout } from '@/game/player/loadout';
 import { loadoutCapacityKg } from '@/game/player/loadout';
+import { resolveWeapon } from '@/game/weapons/weaponStats';
 import type { ExtractionSpawn } from '@/game/map/mapGenerator';
 import type { RaidWorld } from './raidWorld';
 
@@ -43,11 +45,15 @@ export function createPlayer(
   world.renderables.set(entity, { assetKey: 'actor.player', height: 1.8, tint: 0xffffff });
 
   const armorDef = loadout.armorItemId ? findItem(loadout.armorItemId) : undefined;
+  const helmetDef = loadout.helmetItemId ? findItem(loadout.helmetItemId) : undefined;
   world.equipments.set(entity, {
     weaponItemId: loadout.weaponItemId,
     armorItemId: loadout.armorItemId,
+    helmetItemId: loadout.helmetItemId,
     backpackItemId: loadout.backpackItemId,
     armorDurability: armorDef?.armor?.durability ?? 0,
+    helmetDurability: helmetDef?.armor?.durability ?? 0,
+    attachments: { ...loadout.attachments },
   });
 
   const inventory = createInventory(loadoutCapacityKg(loadout));
@@ -56,18 +62,30 @@ export function createPlayer(
 
   const weapon = loadout.weaponItemId ? weaponDefForItem(loadout.weaponItemId) : undefined;
   if (weapon) {
-    // Enter the raid with a full magazine; the rounds come out of the packed
-    // ammunition, so a player who brought none starts dry - as they should.
-    const loaded = Math.min(weapon.magazineSize, countCarried(loadout, weapon.ammoItemId));
+    const resolved = resolveWeapon(weapon.id, loadout.attachments, loadout.preferredAmmoItemId, 1);
+
+    // Enter the raid with a full magazine of the chosen round; those rounds come
+    // out of the packed ammunition, so a player who brought none starts dry.
+    const ammoId =
+      loadout.preferredAmmoItemId && ammoFitsCaliber(loadout.preferredAmmoItemId, weapon.caliber)
+        ? loadout.preferredAmmoItemId
+        : weapon.defaultAmmoItemId;
+    const capacity = resolved?.magazineSize ?? weapon.magazineSize;
+    const loaded = Math.min(capacity, countCarried(loadout, ammoId));
+
     world.weapons.set(entity, {
       weaponId: weapon.id,
       magazine: loaded,
+      loadedAmmoItemId: loaded > 0 ? ammoId : null,
       cooldown: 0,
       reloadRemaining: 0,
       bloomDeg: 0,
+      durability: weapon.durabilityMax * loadout.weaponCondition,
+      durabilityMax: weapon.durabilityMax,
+      jamRemaining: 0,
     });
     const carrier = world.carriers.require(entity);
-    removeExact(carrier.inventory.slots, weapon.ammoItemId, loaded);
+    removeExact(carrier.inventory.slots, ammoId, loaded);
   }
 
   world.playerEntity = entity;
@@ -83,6 +101,10 @@ function weaponDefForItem(itemId: string) {
     if (def && def.itemId === itemId) return def;
   }
   return undefined;
+}
+
+function ammoFitsCaliber(itemId: string, caliber: string): boolean {
+  return findItem(itemId)?.ammo?.caliber === caliber;
 }
 
 function countCarried(loadout: Readonly<Loadout>, itemId: string): number {
@@ -134,9 +156,15 @@ export function createEnemy(
   world.weapons.set(entity, {
     weaponId: def.weaponId,
     magazine: weapon?.magazineSize ?? 10,
+    loadedAmmoItemId: weapon?.defaultAmmoItemId ?? null,
     cooldown: 0,
     reloadRemaining: 0,
     bloomDeg: 0,
+    // Enemy weapons never wear out - their pressure comes from the reload
+    // window, not from maintenance the player cannot see.
+    durability: weapon?.durabilityMax ?? 100,
+    durabilityMax: weapon?.durabilityMax ?? 100,
+    jamRemaining: 0,
   });
 
   world.agents.set(entity, {
@@ -171,12 +199,8 @@ export function createProjectile(
   y: number,
   dirX: number,
   dirY: number,
-  weaponId: string,
-  damage: number,
+  weapon: ResolvedWeapon,
 ): EntityId | null {
-  const weapon = findWeapon(weaponId);
-  if (!weapon) return null;
-
   const entity = world.createEntity();
   const rotation = Math.atan2(dirY, dirX);
 
@@ -184,7 +208,11 @@ export function createProjectile(
   world.projectiles.set(entity, {
     owner,
     ownerFaction,
-    damage,
+    damage: weapon.damage,
+    penetration: weapon.penetration,
+    fragmentation: weapon.fragmentation,
+    fragmentationBonus: weapon.fragmentationBonus,
+    zoneBias: weapon.zoneBias,
     dirX,
     dirY,
     speed: weapon.projectileSpeed,

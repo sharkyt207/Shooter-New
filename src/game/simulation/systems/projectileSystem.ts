@@ -9,7 +9,8 @@
 import { COMBAT } from '@/content/balance';
 import type { EntityId } from '@/core/ecs/entity';
 import { remap } from '@/core/math/scalar';
-import { applyDamage } from '@/game/combat/damage';
+import { resolveHit } from '@/game/combat/ballistics';
+import { applyDamage, isUnaware } from '@/game/combat/damage';
 import { CELL_WALL } from '@/game/map/mapGrid';
 import type { SimContext } from '@/game/simulation/simContext';
 
@@ -131,15 +132,25 @@ function resolveActorHit(
   }
 
   const wasUnaware = isUnaware(ctx, target);
-  applyDamage(ctx, target, projectile.owner, projectile.damage * factor, x, y, wasUnaware);
+
+  // M2: where it lands, what is loaded and what the target wears all matter.
+  const ballistic = resolveHit(ctx, target, {
+    baseDamage: projectile.damage * factor,
+    penetration: projectile.penetration,
+    fragmentation: projectile.fragmentation,
+    fragmentationBonus: projectile.fragmentationBonus,
+    zoneBias: projectile.zoneBias,
+    targetUnaware: wasUnaware,
+  });
+
+  applyDamage(ctx, target, projectile.owner, ballistic.damage, x, y, {
+    zone: ballistic.zone,
+    absorbed: ballistic.absorbed,
+    penetrated: ballistic.penetrated,
+    fragmented: ballistic.fragmented,
+    wasUnaware,
+  });
 
   ctx.bus.emit('projectile:impact', { x, y, surface: 'actor' });
   ctx.world.destroyEntity(projectileEntity);
-}
-
-/** An enemy that has not noticed anyone takes bonus damage - stealth pays off. */
-function isUnaware(ctx: SimContext, entity: EntityId): boolean {
-  const agent = ctx.world.agents.get(entity);
-  if (!agent) return false;
-  return agent.state === 'idle' || agent.state === 'patrol';
 }

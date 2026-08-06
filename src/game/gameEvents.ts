@@ -10,6 +10,7 @@
  */
 
 import type { EntityId } from '@/core/ecs/entity';
+import type { HitZone } from '@/content/types';
 import type { AiState, FactionId } from './components';
 
 /**
@@ -31,17 +32,24 @@ export type GameEvents = {
   'weapon:reloadStarted': { entity: EntityId; weaponId: string; seconds: number };
   'weapon:reloadFinished': { entity: EntityId; weaponId: string };
   'weapon:dryFire': { entity: EntityId; weaponId: string };
+  'weapon:jammed': { entity: EntityId; weaponId: string };
+  'weapon:jamCleared': { entity: EntityId; weaponId: string };
 
   'damage:dealt': {
     target: EntityId;
     source: EntityId;
     amount: number;
-    /** Damage prevented by armor. */
+    /** Damage prevented by armour. */
     absorbed: number;
     x: number;
     y: number;
     isPlayerTarget: boolean;
     wasUnaware: boolean;
+    /** Where the shot landed. Null for area damage such as a grenade. */
+    zone: HitZone | null;
+    /** True when armour was hit and the round went through anyway. */
+    penetrated: boolean;
+    fragmented: boolean;
   };
 
   'projectile:impact': {
@@ -72,6 +80,18 @@ export type GameEvents = {
     contents: Array<{ itemId: string; quantity: number }>;
   };
   'item:used': { entity: EntityId; itemId: string };
+
+  // ── Throwables and melee ─────────────────────────────────────────────────
+  'throwable:thrown': { entity: EntityId; throwableId: string; x: number; y: number };
+  'throwable:detonated': {
+    throwableId: string;
+    kind: string;
+    x: number;
+    y: number;
+    radius: number;
+  };
+  'melee:swing': { entity: EntityId; x: number; y: number; rotation: number };
+  'melee:hit': { entity: EntityId; target: EntityId; silent: boolean };
 
   // ── AI ───────────────────────────────────────────────────────────────────
   'ai:stateChanged': { entity: EntityId; from: AiState; to: AiState };
@@ -115,4 +135,6 @@ export interface RaidOutcome {
   /** Echo shards retained even on death (Pillar P5). */
   retainedShards: number;
   zoneName: string | null;
+  /** Condition the weapon came back in, 0..1. Only meaningful on extraction. */
+  weaponCondition: number;
 }

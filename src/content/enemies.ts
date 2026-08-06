@@ -22,7 +22,7 @@ export const ENEMIES = {
     moveSpeed: 2.5,
     chaseSpeedFactor: 1.25,
     radius: 0.4,
-    armorReduction: 0,
+    armorClass: 0,
     perception: {
       visionRange: 12,
       visionConeDeg: 105,
@@ -49,7 +49,7 @@ export const ENEMIES = {
     moveSpeed: 3.1,
     chaseSpeedFactor: 1.15,
     radius: 0.44,
-    armorReduction: 0.2,
+    armorClass: 2,
     perception: {
       visionRange: 17,
       visionConeDeg: 85,

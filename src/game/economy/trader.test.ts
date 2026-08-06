@@ -15,6 +15,7 @@ function outcome(partial: Partial<RaidOutcome> = {}): RaidOutcome {
     loot: [{ itemId: 'itm_echoshard', quantity: 2 }],
     retainedShards: 0,
     zoneName: 'Nahtzone Nord',
+    weaponCondition: 1,
     ...partial,
   };
 }

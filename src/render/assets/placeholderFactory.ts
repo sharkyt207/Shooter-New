@@ -238,6 +238,15 @@ export class PlaceholderFactory {
     const color = fxColorFor(key);
     const g = new Graphics();
 
+    if (key.startsWith('fx.throwable.')) {
+      // A small solid object, not a glow - it has to read as something lying
+      // on the floor that is about to go off.
+      g.circle(32, 32, 9).fill({ color });
+      g.circle(32, 32, 9).stroke({ width: 2, color: PALETTE.bone, alpha: 0.7 });
+      g.circle(32, 32, 16).fill({ color, alpha: 0.22 });
+      return this.toTexture(g);
+    }
+
     if (key === 'fx.projectile') {
       g.circle(32, 32, 5).fill({ color: 0xfff4d6 });
       g.circle(32, 32, 10).fill({ color, alpha: 0.35 });
@@ -328,5 +337,9 @@ function fxColorFor(key: string): number {
   if (key.includes('muzzle')) return 0xffe6a8;
   if (key.includes('flesh')) return PALETTE.danger;
   if (key.includes('extraction')) return PALETTE.extraction;
+  // Throwables read by colour: red is lethal, white blinds, cyan is a decoy.
+  if (key.includes('throwable.frag')) return PALETTE.danger;
+  if (key.includes('throwable.flash')) return 0xfff6dc;
+  if (key.includes('throwable.lure')) return PALETTE.echo;
   return PALETTE.bone;
 }

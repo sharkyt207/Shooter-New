@@ -35,6 +35,7 @@ import {
 } from './factories';
 import { RaidWorld } from './raidWorld';
 import type { SimContext } from './simContext';
+import { throwableSystem } from '@/game/combat/throwables';
 import { anomalySystem } from './systems/anomalySystem';
 import { deathSystem } from './systems/deathSystem';
 import { extractionSystem } from './systems/extractionSystem';
@@ -97,6 +98,7 @@ export class RaidSimulation {
       noises: [],
       interactionTarget: null,
       entitiesInAnomaly: new Set<EntityId>(),
+      meleeCooldown: 0,
       pendingOutcome: null,
       extractedZoneName: null,
     };
@@ -162,6 +164,7 @@ export class RaidSimulation {
     aiSystem(this.ctx);
     updateWeapons(this.ctx);
     projectileSystem(this.ctx);
+    throwableSystem(this.ctx);
     deathSystem(this.ctx);
     interactionSystem(this.ctx);
     anomalySystem(this.ctx);
@@ -289,6 +292,14 @@ export class RaidSimulation {
       (extracted ? ECONOMY.extractionXp : 0) +
       Math.floor((lootValue / 1000) * ECONOMY.xpPerThousandValue);
 
+    // Wear carries back into the profile, so a weapon that survived a hard raid
+    // is genuinely more worn on the next one.
+    const weaponState = player !== null ? this.world.weapons.get(player) : undefined;
+    const weaponCondition =
+      weaponState && weaponState.durabilityMax > 0
+        ? weaponState.durability / weaponState.durabilityMax
+        : 1;
+
     this.finishedOutcome = {
       kind,
       durationSeconds: this.elapsedSeconds,
@@ -298,6 +309,7 @@ export class RaidSimulation {
       loot,
       retainedShards,
       zoneName: this.ctx.extractedZoneName,
+      weaponCondition,
     };
 
     this.bus.emit('raid:ended', { outcome: this.finishedOutcome });

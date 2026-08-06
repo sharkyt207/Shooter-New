@@ -8,7 +8,11 @@ function testLoadout(): Loadout {
   return {
     weaponItemId: 'itm_wpn_splitter',
     armorItemId: 'itm_armor_fiber',
+    helmetItemId: null,
     backpackItemId: 'itm_bag_medium',
+    attachments: {},
+    preferredAmmoItemId: 'itm_ammo_9mm',
+    weaponCondition: 1,
     carried: [
       { itemId: 'itm_ammo_9mm', quantity: 120 },
       { itemId: 'itm_bandage', quantity: 2 },

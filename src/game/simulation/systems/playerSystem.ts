@@ -4,10 +4,12 @@
  * Reads only `ctx.intent` - never an input device (ADR-002).
  */
 
-import { COMBAT, ENCUMBRANCE, PLAYER } from '@/content/balance';
+import { COMBAT, ENCUMBRANCE, MELEE, PLAYER } from '@/content/balance';
 import { findItem } from '@/content/items';
 import { approachAngle, clamp, clamp01, DEG_TO_RAD, remap } from '@/core/math/scalar';
 import { applyHealing } from '@/game/combat/damage';
+import { meleeAttack } from '@/game/combat/melee';
+import { throwItem } from '@/game/combat/throwables';
 import { loadFraction, removeItem } from '@/game/inventory/inventory';
 import { createLootDrop } from '@/game/simulation/factories';
 import { moveCircle } from '@/game/simulation/collision';
@@ -119,6 +121,25 @@ export function playerSystem(ctx: SimContext): void {
       });
     }
   }
+
+  // ── Throwables and melee ─────────────────────────────────────────────────
+  // Both are one-shot actions and both share the aim direction, so they read as
+  // "do this, in the direction I am pointing".
+  if (!busy && intent.throwItemId) {
+    const aimDirX = Math.cos(transform.rotation);
+    const aimDirY = Math.sin(transform.rotation);
+    if (throwItem(ctx, entity, intent.throwItemId, aimDirX, aimDirY)) {
+      ctx.bus.emit('player:weightChanged', {
+        weight: loadFraction(carrier.inventory) * carrier.inventory.capacityKg,
+        capacity: carrier.inventory.capacityKg,
+      });
+    }
+  }
+
+  if (!busy && intent.melee && ctx.meleeCooldown <= 0) {
+    if (meleeAttack(ctx, entity)) ctx.meleeCooldown = MELEE.cooldownSeconds;
+  }
+  if (ctx.meleeCooldown > 0) ctx.meleeCooldown = Math.max(0, ctx.meleeCooldown - dt);
 
   // ── Weapon ───────────────────────────────────────────────────────────────
   if (!busy) {

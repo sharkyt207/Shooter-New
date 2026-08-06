@@ -75,11 +75,19 @@ export function buyItem(profile: PlayerProfile, itemId: string, quantity: number
 /** What the trader currently offers. Deliberately small and useful for M1. */
 export const TRADER_STOCK: ReadonlyArray<{ itemId: string; quantity: number }> = [
   { itemId: 'itm_ammo_9mm', quantity: 240 },
+  { itemId: 'itm_ammo_9mm_hp', quantity: 90 },
+  { itemId: 'itm_ammo_9mm_ap', quantity: 60 },
   { itemId: 'itm_ammo_12', quantity: 90 },
+  { itemId: 'itm_ammo_12_slug', quantity: 30 },
   { itemId: 'itm_ammo_74', quantity: 120 },
   { itemId: 'itm_bandage', quantity: 12 },
   { itemId: 'itm_medkit', quantity: 4 },
+  { itemId: 'itm_thr_frag', quantity: 4 },
+  { itemId: 'itm_thr_flash', quantity: 4 },
+  { itemId: 'itm_thr_lure', quantity: 3 },
   { itemId: 'itm_armor_fiber', quantity: 2 },
+  { itemId: 'itm_att_sight_reflex', quantity: 1 },
+  { itemId: 'itm_att_mag_extended', quantity: 1 },
   { itemId: 'itm_bag_medium', quantity: 1 },
   { itemId: 'itm_wpn_bruch', quantity: 1 },
 ];
@@ -100,6 +108,9 @@ export function settleRaid(profile: PlayerProfile, outcome: RaidOutcome): Settle
   const overflow: Array<{ itemId: string; quantity: number }> = [];
 
   if (outcome.kind === 'extracted') {
+    // The weapon came back worn - that wear is now the player's problem.
+    profile.loadout.weaponCondition = Math.max(0, Math.min(1, outcome.weaponCondition));
+
     for (const entry of outcome.loot) {
       const added = addItem(profile.stash, entry.itemId, entry.quantity);
       if (added < entry.quantity) {
@@ -111,10 +122,15 @@ export function settleRaid(profile: PlayerProfile, outcome: RaidOutcome): Settle
     profile.stats.bestHaul = Math.max(profile.stats.bestHaul, outcome.lootValue);
   } else {
     // Gear loss. The loadout items are already gone - they were consumed when
-    // the raid started (see `commitLoadout`).
+    // the raid started (see `commitLoadout`). Fitted attachments go with the
+    // weapon, and a replacement weapon starts fresh.
     if (outcome.kind === 'died') profile.stats.deaths++;
     else profile.stats.timeouts++;
     profile.echoShards += outcome.retainedShards;
+
+    profile.loadout.attachments = {};
+    profile.loadout.weaponCondition = 1;
+    profile.weaponRepairs = 0;
   }
 
   profile.stats.kills += outcome.kills;
@@ -133,7 +149,14 @@ export function commitLoadout(profile: PlayerProfile): boolean {
   const { loadout, stash } = profile;
   const required: Array<{ itemId: string; quantity: number }> = [];
 
-  for (const id of [loadout.weaponItemId, loadout.armorItemId, loadout.backpackItemId]) {
+  // Attachments are NOT listed here: fitting one already took it out of the
+  // stash (see game/base/workshop.ts), so charging for it twice would delete it.
+  for (const id of [
+    loadout.weaponItemId,
+    loadout.armorItemId,
+    loadout.helmetItemId,
+    loadout.backpackItemId,
+  ]) {
     if (id) required.push({ itemId: id, quantity: 1 });
   }
   for (const slot of loadout.carried) {
@@ -156,7 +179,12 @@ export function commitLoadout(profile: PlayerProfile): boolean {
 /** Put the loadout back, e.g. when the player backs out of the briefing. */
 export function refundLoadout(stash: InventoryState, profile: Readonly<PlayerProfile>): void {
   const { loadout } = profile;
-  for (const id of [loadout.weaponItemId, loadout.armorItemId, loadout.backpackItemId]) {
+  for (const id of [
+    loadout.weaponItemId,
+    loadout.armorItemId,
+    loadout.helmetItemId,
+    loadout.backpackItemId,
+  ]) {
     if (id) addItem(stash, id, 1);
   }
   for (const slot of loadout.carried) addItem(stash, slot.itemId, slot.quantity);

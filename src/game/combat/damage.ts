@@ -1,13 +1,17 @@
 /**
  * Damage application.
  *
- * One entry point, so armor, the grace period, death handling and the event
+ * One entry point, so armour, the grace period, death handling and the event
  * contract can never diverge between "shot by a player" and "shot by an AI".
+ *
+ * Since M2 the ballistic resolution (hit zone, penetration, fragmentation) lives
+ * in `ballistics.ts`. This module takes an already-resolved amount and applies
+ * it - which keeps area damage from grenades and anomalies on the same path
+ * without pretending they hit a body part.
  */
 
 import { COMBAT } from '@/content/balance';
-import { findEnemy } from '@/content/enemies';
-import { findItem } from '@/content/items';
+import type { HitZone } from '@/content/types';
 import type { EntityId } from '@/core/ecs/entity';
 import { clamp } from '@/core/math/scalar';
 import type { SimContext } from '@/game/simulation/simContext';
@@ -16,6 +20,18 @@ export interface DamageResult {
   applied: number;
   absorbed: number;
   killed: boolean;
+}
+
+export interface DamageOptions {
+  /** Body part that was hit. Null for area damage. */
+  zone?: HitZone | null;
+  /** Damage the target's armour absorbed before this call. */
+  absorbed?: number;
+  penetrated?: boolean;
+  fragmented?: boolean;
+  wasUnaware?: boolean;
+  /** Skip the unaware multiplier - callers that already applied it. */
+  skipUnawareBonus?: boolean;
 }
 
 const result: DamageResult = { applied: 0, absorbed: 0, killed: false };
@@ -27,11 +43,11 @@ export function applyDamage(
   rawAmount: number,
   hitX: number,
   hitY: number,
-  wasUnaware = false,
+  options: DamageOptions = {},
 ): DamageResult {
   const { world } = ctx;
   result.applied = 0;
-  result.absorbed = 0;
+  result.absorbed = options.absorbed ?? 0;
   result.killed = false;
 
   const health = world.healths.get(target);
@@ -42,24 +58,18 @@ export function applyDamage(
   const graceTicks = COMBAT.damageGraceSeconds / ctx.dt;
   const withinGrace = ctx.tick - health.lastDamageTick < graceTicks;
 
+  const wasUnaware = options.wasUnaware ?? false;
   let amount = rawAmount;
-  if (wasUnaware) amount *= COMBAT.unawareDamageMultiplier;
+  if (wasUnaware && !options.skipUnawareBonus) amount *= COMBAT.unawareDamageMultiplier;
 
-  const reduction = armorReductionOf(ctx, target);
-  const afterArmor = Math.max(amount * COMBAT.minDamageAfterArmor, amount * (1 - reduction));
-  const absorbed = amount - afterArmor;
-
-  consumeArmorDurability(ctx, target);
-
-  const dealt = Math.min(afterArmor, health.current);
-  health.current = clamp(health.current - afterArmor, 0, health.max);
+  const dealt = Math.min(amount, health.current);
+  health.current = clamp(health.current - amount, 0, health.max);
   health.lastDamageTick = ctx.tick;
   health.lastAttacker = source;
 
   world.hitFlashes.set(target, { remaining: 0.12 });
 
   result.applied = dealt;
-  result.absorbed = absorbed;
   result.killed = health.current <= 0;
 
   const isPlayerTarget = world.players.has(target);
@@ -67,11 +77,14 @@ export function applyDamage(
     target,
     source,
     amount: dealt,
-    absorbed,
+    absorbed: result.absorbed,
     x: hitX,
     y: hitY,
     isPlayerTarget,
     wasUnaware,
+    zone: options.zone ?? null,
+    penetrated: options.penetrated ?? true,
+    fragmented: options.fragmented ?? false,
   });
 
   if (isPlayerTarget) {
@@ -80,26 +93,6 @@ export function applyDamage(
   }
 
   return result;
-}
-
-function armorReductionOf(ctx: SimContext, entity: EntityId): number {
-  const equipment = ctx.world.equipments.get(entity);
-  if (equipment) {
-    if (!equipment.armorItemId || equipment.armorDurability <= 0) return 0;
-    const def = findItem(equipment.armorItemId);
-    return def?.armor?.reduction ?? 0;
-  }
-
-  const agent = ctx.world.agents.get(entity);
-  if (agent) return findEnemy(agent.enemyId)?.armorReduction ?? 0;
-
-  return 0;
-}
-
-function consumeArmorDurability(ctx: SimContext, entity: EntityId): void {
-  const equipment = ctx.world.equipments.get(entity);
-  if (!equipment || !equipment.armorItemId) return;
-  equipment.armorDurability = Math.max(0, equipment.armorDurability - COMBAT.armorDurabilityPerHit);
 }
 
 /** Heal an entity, clamped to its maximum. Returns how much was actually restored. */
@@ -115,4 +108,12 @@ export function applyHealing(ctx: SimContext, entity: EntityId, amount: number):
     ctx.bus.emit('player:healthChanged', { current: health.current, max: health.max });
   }
   return restored;
+}
+
+/** Has this entity not noticed anyone yet? Drives the ambush bonus. */
+export function isUnaware(ctx: SimContext, entity: EntityId): boolean {
+  if (ctx.world.disoriented.has(entity)) return true;
+  const agent = ctx.world.agents.get(entity);
+  if (!agent) return false;
+  return agent.state === 'idle' || agent.state === 'patrol';
 }

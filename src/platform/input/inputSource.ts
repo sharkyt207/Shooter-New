@@ -22,6 +22,8 @@ export interface InputState {
   /** One-shot UI requests, cleared by the consumer each frame. */
   toggleInventory: boolean;
   pause: boolean;
+  /** One-shot melee swing. */
+  melee: boolean;
 }
 
 export function createInputState(): InputState {
@@ -36,6 +38,7 @@ export function createInputState(): InputState {
     interact: false,
     toggleInventory: false,
     pause: false,
+    melee: false,
   };
 }
 
@@ -78,6 +81,7 @@ export class CompositeInput implements InputSource {
     out.interact = false;
     out.toggleInventory = false;
     out.pause = false;
+    out.melee = false;
 
     for (const source of this.sources) {
       const s = source.read();
@@ -97,6 +101,7 @@ export class CompositeInput implements InputSource {
       out.interact ||= s.interact;
       out.toggleInventory ||= s.toggleInventory;
       out.pause ||= s.pause;
+      out.melee ||= s.melee;
     }
 
     return out;

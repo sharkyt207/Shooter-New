@@ -28,8 +28,14 @@ export const WEAPONS = {
     effectiveRange: 11,
     maxRange: 26,
     minDamageFactor: 0.42,
-    ammoItemId: 'itm_ammo_9mm',
+    caliber: 'cal_9mm',
+    defaultAmmoItemId: 'itm_ammo_9mm',
     noiseRadius: 24,
+    ergonomics: 68,
+    durabilityMax: 100,
+    wearPerShot: 0.05,
+    slots: ['barrel', 'sight', 'magazine', 'muzzle'],
+    zoneBias: { head: 6, torso: 62, limbs: 32 },
     visual: 'weapon.splitter',
   },
   wpn_nadel: {
@@ -50,8 +56,14 @@ export const WEAPONS = {
     effectiveRange: 26,
     maxRange: 46,
     minDamageFactor: 0.75,
-    ammoItemId: 'itm_ammo_74',
+    caliber: 'cal_74',
+    defaultAmmoItemId: 'itm_ammo_74',
     noiseRadius: 38,
+    ergonomics: 45,
+    durabilityMax: 120,
+    wearPerShot: 0.11,
+    slots: ['barrel', 'sight', 'magazine', 'muzzle'],
+    zoneBias: { head: 14, torso: 62, limbs: 24 },
     visual: 'weapon.nadel',
   },
   wpn_bruch: {
@@ -72,8 +84,14 @@ export const WEAPONS = {
     effectiveRange: 6,
     maxRange: 15,
     minDamageFactor: 0.18,
-    ammoItemId: 'itm_ammo_12',
+    caliber: 'cal_12',
+    defaultAmmoItemId: 'itm_ammo_12',
     noiseRadius: 32,
+    ergonomics: 52,
+    durabilityMax: 90,
+    wearPerShot: 0.16,
+    slots: ['barrel', 'sight', 'muzzle'],
+    zoneBias: { head: 4, torso: 58, limbs: 38 },
     visual: 'weapon.bruch',
   },
 
@@ -97,8 +115,14 @@ export const WEAPONS = {
     effectiveRange: 8,
     maxRange: 18,
     minDamageFactor: 0.35,
-    ammoItemId: 'itm_ammo_9mm',
+    caliber: 'cal_9mm',
+    defaultAmmoItemId: 'itm_ammo_9mm',
     noiseRadius: 20,
+    ergonomics: 35,
+    durabilityMax: 60,
+    wearPerShot: 0,
+    slots: [],
+    zoneBias: { head: 5, torso: 60, limbs: 35 },
     visual: 'weapon.pipe',
   },
   wpn_order_carbine: {
@@ -119,8 +143,14 @@ export const WEAPONS = {
     effectiveRange: 16,
     maxRange: 32,
     minDamageFactor: 0.5,
-    ammoItemId: 'itm_ammo_74',
+    caliber: 'cal_74',
+    defaultAmmoItemId: 'itm_ammo_74',
     noiseRadius: 30,
+    ergonomics: 60,
+    durabilityMax: 110,
+    wearPerShot: 0,
+    slots: [],
+    zoneBias: { head: 9, torso: 62, limbs: 29 },
     visual: 'weapon.carbine',
   },
 } as const satisfies Record<string, WeaponDef>;
@@ -147,6 +177,6 @@ export function weaponForItem(itemId: string): WeaponDef | undefined {
 }
 
 /** Seconds between shots, derived from RPM. */
-export function shotIntervalSeconds(weapon: WeaponDef): number {
+export function shotIntervalSeconds(weapon: { roundsPerMinute: number }): number {
   return 60 / weapon.roundsPerMinute;
 }

@@ -25,6 +25,9 @@ export interface PlayerIntent {
   useItemId: string | null;
   dropItemId: string | null;
   dropQuantity: number;
+  /** Throwable to throw this tick, in the current aim direction. */
+  throwItemId: string | null;
+  melee: boolean;
 }
 
 export function createIntent(): PlayerIntent {
@@ -40,6 +43,8 @@ export function createIntent(): PlayerIntent {
     useItemId: null,
     dropItemId: null,
     dropQuantity: 0,
+    throwItemId: null,
+    melee: false,
   };
 }
 
@@ -59,10 +64,14 @@ export function copyIntent(target: PlayerIntent, source: Readonly<PlayerIntent>)
     target.dropItemId = source.dropItemId;
     target.dropQuantity = source.dropQuantity;
   }
+  if (source.throwItemId !== null) target.throwItemId = source.throwItemId;
+  if (source.melee) target.melee = true;
 }
 
 export function clearOneShots(intent: PlayerIntent): void {
   intent.useItemId = null;
   intent.dropItemId = null;
   intent.dropQuantity = 0;
+  intent.throwItemId = null;
+  intent.melee = false;
 }

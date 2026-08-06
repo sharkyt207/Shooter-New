@@ -11,7 +11,7 @@ import { findItem } from '@/content/items';
 import { findWeapon } from '@/content/weapons';
 import type { ExtractionPhase } from '@/game/components';
 import { countItem, totalValue, totalWeight } from '@/game/inventory/inventory';
-import type { InventorySlot } from '@/game/inventory/inventory';
+import type { InventorySlot, InventoryState } from '@/game/inventory/inventory';
 import type { RaidSimulation } from '@/game/simulation/raidSimulation';
 
 export interface HudZone {
@@ -66,6 +66,13 @@ export interface HudViewModel {
   usingItemLabel: string | null;
   usingItemProgress: number;
 
+  /** Weapon is jammed and cannot fire until cleared. */
+  jammed: boolean;
+  /** 0..1 weapon condition, so the HUD can warn before it starts jamming. */
+  weaponCondition: number;
+  /** Name of the chambered round, for the ammo readout. */
+  ammoName: string | null;
+
   playerX: number;
   playerY: number;
   playerRotation: number;
@@ -74,6 +81,8 @@ export interface HudViewModel {
   inventory: HudItem[];
   /** Consumables, surfaced as quick-use buttons in the HUD. */
   consumables: HudItem[];
+  /** Throwables, surfaced as their own HUD buttons. */
+  throwables: HudItem[];
 }
 
 const EMPTY: HudViewModel = {
@@ -100,12 +109,16 @@ const EMPTY: HudViewModel = {
   extractionZoneName: null,
   usingItemLabel: null,
   usingItemProgress: 0,
+  jammed: false,
+  weaponCondition: 1,
+  ammoName: null,
   playerX: 0,
   playerY: 0,
   playerRotation: 0,
   zones: [],
   inventory: [],
   consumables: [],
+  throwables: [],
 };
 
 export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
@@ -157,7 +170,7 @@ export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
     weaponName: weaponDef?.name ?? 'Unbewaffnet',
     magazine: weaponState?.magazine ?? 0,
     magazineSize: weaponDef?.magazineSize ?? 0,
-    reserveAmmo: inventory && weaponDef ? countItem(inventory, weaponDef.ammoItemId) : 0,
+    reserveAmmo: reserveAmmoFor(inventory, weaponState?.loadedAmmoItemId ?? weaponDef?.defaultAmmoItemId ?? null),
     reloading: (weaponState?.reloadRemaining ?? 0) > 0,
     reloadProgress:
       weaponState && weaponDef && weaponState.reloadRemaining > 0
@@ -176,6 +189,15 @@ export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
     usingItemLabel: usingItem ? (findItem(usingItem.itemId)?.name ?? null) : null,
     usingItemProgress: usingItem ? 1 - usingItem.remaining / usingItem.total : 0,
 
+    jammed: (weaponState?.jamRemaining ?? 0) > 0,
+    weaponCondition:
+      weaponState && weaponState.durabilityMax > 0
+        ? weaponState.durability / weaponState.durabilityMax
+        : 1,
+    ammoName: weaponState?.loadedAmmoItemId
+      ? (findItem(weaponState.loadedAmmoItemId)?.name ?? null)
+      : null,
+
     playerX: transform?.x ?? 0,
     playerY: transform?.y ?? 0,
     playerRotation: transform?.rotation ?? 0,
@@ -185,7 +207,20 @@ export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
     consumables: inventory
       ? toHudItems(inventory.slots).filter((item) => item.category === 'medical')
       : [],
+    throwables: inventory
+      ? mergeHudItems(toHudItems(inventory.slots).filter((item) => item.category === 'throwable'))
+      : [],
   };
+}
+
+/**
+ * Rounds of the chambered type still in reserve.
+ * Shows what can actually be loaded next, not every round of that calibre -
+ * a magazine of armour-piercing cannot be topped up with buckshot.
+ */
+function reserveAmmoFor(inventory: InventoryState | undefined, ammoItemId: string | null): number {
+  if (!inventory || !ammoItemId) return 0;
+  return countItem(inventory, ammoItemId);
 }
 
 export function toHudItems(slots: readonly InventorySlot[]): HudItem[] {

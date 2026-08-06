@@ -33,6 +33,8 @@ Legende Reifegrad: 🟢 Prototyp fertig · 🟡 Grundgerüst · ⚪ geplant
 | `content/weapons` | Waffen-Stats, Munitionstyp, Handling | 🟢 |
 | `content/enemies` | Gegner-Archetypen: Stats, Wahrnehmung, Verhalten, Loot | 🟢 |
 | `content/lootTables` | Gewichtete Tabellen pro Containertyp und Biom | 🟢 |
+| `content/attachments` | Waffenaufsätze mit Stat-Deltas | 🟢 |
+| `content/throwables` | Splitterladung, Blender, Echo-Köder | 🟢 |
 | `content/biomes` | Fragment-Typen der Echo-Welt (Labor, Wald, Station, …) | 🟢 |
 | `content/baseModules` | Basisgebäude, Ausbaustufen, Kosten, Freischaltungen, Crafting-Rezepte | 🟡 |
 | `content/balance` | **Alle** Balance-Konstanten zentral | 🟢 |
@@ -60,11 +62,15 @@ Spielererstellung aus Loadout, Health/Stamina, Intent-Verarbeitung, Tod.
 **Vertrag:** `createPlayer(world, loadout, spawn)`, `PlayerIntent`.
 
 ### `game/weapons` 🟢
-Feuerrate, Magazin, Nachladen, Streuung, Munitionsverbrauch.
-Erzeugt Projektil-Anfragen — trifft keine Schadensentscheidung (Trennung von Feuern und Wirkung).
+Feuerrate, Magazin, Nachladen, Streuung, Verschleiß, Ladehemmung.
+`resolveWeapon` löst Basiswerte + Aufsätze + geladene Munition + Verschleiß zu
+einem `ResolvedWeapon` auf — der Feuercode kennt keine Aufsätze.
+Erzeugt Projektile, trifft aber keine Schadensentscheidung.
 
 ### `game/combat` 🟢
-Projektilbewegung, Kollision, Schadensberechnung (Rüstung, Falloff), Tod und Aufräumen.
+Projektilbewegung und Kollision (`projectileSystem`), Trefferzonen und
+Durchschlag (`ballistics`), Schadensanwendung (`damage`), Wurfgeschosse
+(`throwables`), Nahkampf (`melee`).
 
 ### `game/inventory` 🟢
 Gewichts- und Slot-basiertes Container-System (bewusst **kein** Tetris-Grid, siehe ADR-005).
@@ -94,6 +100,10 @@ Abbruch bei Verlassen der Zone oder bei Beschuss. Erfolgreiche Nutzung setzt `us
 ### `game/map` 🟢
 Fragment-Komposition: mehrere Biom-Fragmente werden über Nahtzonen verbunden,
 daraus entstehen Kollisionsgitter, Spawns, Loot-Punkte, Extraction-Zonen.
+
+### `game/base/workshop` 🟢
+Aufsätze montieren und Waffen instandsetzen. Ein Tausch gibt das verdrängte Teil
+zurück ins Lager — ein Teil geht nie durch einen Fehlgriff verloren.
 
 ### `game/base` 🟡 · `game/economy` 🟡 · `game/crafting` 🟡
 Meta-Progression zwischen den Raids. Im Prototyp als funktionsfähiges Grundgerüst,
@@ -137,7 +147,7 @@ Der Rest des Spiels kennt nur das Interface.
 |-------|-------|
 | `ui/uiRoot` | Screen-Stack, Ein-/Ausblenden, Lebenszyklus |
 | `ui/hud/*` | Vitals, Munition, Minimap, Extraction-Banner, Touch-Sticks |
-| `ui/screens/*` | MainMenu, Base, Loadout, Briefing, Result, Inventory, Pause |
+| `ui/screens/*` | MainMenu, Base, Loadout, Workshop, Briefing, Result, Inventory, Pause |
 | `ui/components/dom` | Deklarative Elementerzeugung, Balken, Formatierung |
 | `ui/styles/*` | Design-Tokens (Farben, Abstände, Radien, Schrift) |
 | `ui/viewModel` | Übersetzt ECS-Zustand in ein flaches UI-Snapshot-Objekt |
@@ -161,6 +171,9 @@ Der Rest des Spiels kennt nur das Interface.
 | Wunsch | Nötige Änderung |
 |--------|-----------------|
 | Neue Waffe | 1 Eintrag in `content/weapons.ts` + 1 Zeile im Asset-Manifest |
+| Neue Munition | 1 Eintrag in `content/items.ts` mit `ammo`-Block |
+| Neuer Aufsatz | 1 Eintrag in `content/attachments.ts` + 1 Item |
+| Neues Wurfgeschoss | 1 Eintrag in `content/throwables.ts` + 1 Item |
 | Neuer Gegnertyp | 1 Eintrag in `content/enemies.ts` (+ optional neuer AI-Zustand) |
 | Neues Biom | 1 Eintrag in `content/biomes.ts` |
 | Neues Basisgebäude | 1 Eintrag in `content/baseModules.ts` |

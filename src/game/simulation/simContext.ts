@@ -61,6 +61,9 @@ export interface SimContext {
   /** Entities currently inside an anomaly, so enter/exit events fire exactly once. */
   readonly entitiesInAnomaly: Set<EntityId>;
 
+  /** Seconds until the player may swing again. */
+  meleeCooldown: number;
+
   /** Set by a system to end the raid. Consumed by the simulation. */
   pendingOutcome: RaidOutcomeKind | null;
   /** Name of the zone the player extracted through, for the result screen. */

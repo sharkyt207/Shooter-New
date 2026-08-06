@@ -8,9 +8,10 @@
  */
 
 import { findItem } from '@/content/items';
+import { weaponForItem } from '@/content/weapons';
 import { countItem } from '@/game/inventory/inventory';
 import type { PlayerProfile } from '@/game/base/profile';
-import { loadoutCapacityKg, loadoutValue, loadoutWeightKg } from '@/game/player/loadout';
+import { equippedWeightKg, loadoutCapacityKg, loadoutValue, loadoutWeightKg } from '@/game/player/loadout';
 import { mergeHudItems, toHudItems, type HudItem } from '@/ui/viewModel';
 import { bar, clear, el, formatCredits, formatWeight } from '@/ui/components/dom';
 import type { Screen } from '@/ui/uiRoot';
@@ -19,8 +20,11 @@ export interface LoadoutCallbacks {
   onBack(): void;
   onConfirm(): void;
   /** Equip (or unequip with `null`) a slot; the state machine mutates the profile. */
-  onEquip(slot: 'weapon' | 'armor' | 'backpack', itemId: string | null): void;
+  onEquip(slot: 'weapon' | 'armor' | 'helmet' | 'backpack', itemId: string | null): void;
   onCarryChange(itemId: string, delta: number): void;
+  /** Choose which round to chamber. */
+  onSelectAmmo(itemId: string | null): void;
+  onOpenWorkshop(): void;
 }
 
 export function createLoadoutScreen(profile: PlayerProfile, callbacks: LoadoutCallbacks): Screen {
@@ -42,9 +46,16 @@ export function createLoadoutScreen(profile: PlayerProfile, callbacks: LoadoutCa
     content.appendChild(
       slotPanel('Waffe', 'weapon', profile.loadout.weaponItemId, owned.filter((i) => i.category === 'weapon'), callbacks),
     );
-    content.appendChild(
-      slotPanel('Rüstung', 'armor', profile.loadout.armorItemId, owned.filter((i) => i.category === 'armor'), callbacks),
+    const armorItems = owned.filter(
+      (i) => i.category === 'armor' && (findItem(i.itemId)?.armor?.coverage ?? []).includes('torso'),
     );
+    const helmetItems = owned.filter(
+      (i) => i.category === 'armor' && (findItem(i.itemId)?.armor?.coverage ?? []).includes('head'),
+    );
+
+    content.appendChild(slotPanel('Rüstung', 'armor', profile.loadout.armorItemId, armorItems, callbacks));
+    content.appendChild(slotPanel('Helm', 'helmet', profile.loadout.helmetItemId, helmetItems, callbacks));
+    content.appendChild(ammoPanel(profile, owned, callbacks));
     content.appendChild(
       slotPanel('Rucksack', 'backpack', profile.loadout.backpackItemId, owned.filter((i) => i.category === 'backpack'), callbacks),
     );
@@ -55,7 +66,11 @@ export function createLoadoutScreen(profile: PlayerProfile, callbacks: LoadoutCa
     const capacity = loadoutCapacityKg(profile.loadout);
 
     riskLabel.textContent = formatCredits(value);
-    weightLabel.textContent = `${formatWeight(weight)} / ${formatWeight(capacity)}`;
+    // Carried weight fills the backpack; worn gear is listed separately so the
+    // player can see what an over-modified weapon actually costs them.
+    weightLabel.textContent =
+      `${formatWeight(weight)} / ${formatWeight(capacity)}` +
+      ` · getragen ${formatWeight(equippedWeightKg(profile.loadout))}`;
     weightBar.set(capacity > 0 ? weight / capacity : 0);
     weightBar.setClass('is-over', weight > capacity);
     confirmButton.disabled = weight > capacity || profile.loadout.weaponItemId === null;
@@ -84,6 +99,12 @@ export function createLoadoutScreen(profile: PlayerProfile, callbacks: LoadoutCa
       el('div', { style: { height: 'var(--space-3)' } }),
       content,
       el('div', { style: { height: 'var(--space-3)' } }),
+      el('button', {
+        className: 'btn btn--ghost btn--block',
+        text: 'Werkstatt öffnen',
+        onClick: () => callbacks.onOpenWorkshop(),
+      }),
+      el('div', { style: { height: 'var(--space-2)' } }),
       confirmButton,
     ],
   });
@@ -93,9 +114,76 @@ export function createLoadoutScreen(profile: PlayerProfile, callbacks: LoadoutCa
   return { root };
 }
 
+/**
+ * Ammunition choice.
+ *
+ * This is the single most consequential decision on the screen since M2: the
+ * same weapon behaves completely differently depending on what is chambered,
+ * so each option states plainly what it trades away.
+ */
+function ammoPanel(
+  profile: PlayerProfile,
+  owned: HudItem[],
+  callbacks: LoadoutCallbacks,
+): HTMLElement {
+  const weapon = profile.loadout.weaponItemId
+    ? weaponForItem(profile.loadout.weaponItemId)
+    : undefined;
+
+  const list = el('div', { className: 'item-list' });
+  if (!weapon) {
+    list.appendChild(el('div', { className: 'muted', text: 'Erst eine Waffe wählen.' }));
+    return el('div', {
+      className: 'panel',
+      children: [el('div', { className: 'panel__title', text: 'Munition' }), list],
+    });
+  }
+
+  const matching = owned.filter((item) => findItem(item.itemId)?.ammo?.caliber === weapon.caliber);
+  if (matching.length === 0) {
+    list.appendChild(
+      el('div', { className: 'muted', text: 'Keine passende Munition im Lager.' }),
+    );
+  }
+
+  for (const item of matching) {
+    const ammo = findItem(item.itemId)?.ammo;
+    if (!ammo) continue;
+    const selected = profile.loadout.preferredAmmoItemId === item.itemId;
+
+    list.appendChild(
+      el('div', {
+        className: `item${selected ? ' item--selected' : ''}`,
+        data: { rarity: item.rarity },
+        onClick: () => callbacks.onSelectAmmo(item.itemId),
+        children: [
+          el('div', {
+            className: 'grow',
+            children: [
+              el('div', { className: 'item__name', text: item.name }),
+              el('div', {
+                className: 'item__meta',
+                text: `Durchschlag ${ammo.penetration} · Schaden ×${ammo.damageMultiplier.toFixed(2)}${
+                  ammo.fragmentation > 0 ? ` · Splitter ${Math.round(ammo.fragmentation * 100)} %` : ''
+                }`,
+              }),
+            ],
+          }),
+          el('div', { className: 'item__meta', text: `${item.quantity}` }),
+        ],
+      }),
+    );
+  }
+
+  return el('div', {
+    className: 'panel',
+    children: [el('div', { className: 'panel__title', text: 'Munition' }), list],
+  });
+}
+
 function slotPanel(
   title: string,
-  slot: 'weapon' | 'armor' | 'backpack',
+  slot: 'weapon' | 'armor' | 'helmet' | 'backpack',
   equippedId: string | null,
   options: HudItem[],
   callbacks: LoadoutCallbacks,

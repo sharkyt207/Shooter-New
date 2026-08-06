@@ -65,11 +65,6 @@ export const COMBAT = {
   /** Degrees of accumulated spread shed per second once the trigger is released. */
   bloomDecayDegPerSecond: 7.5,
 
-  /** Armor cannot reduce damage below this fraction. */
-  minDamageAfterArmor: 0.15,
-  /** Durability lost per absorbed hit. */
-  armorDurabilityPerHit: 1.4,
-
   /** Seconds of invulnerability after taking damage. Prevents burst-frame death. */
   damageGraceSeconds: 0.05,
 
@@ -78,6 +73,89 @@ export const COMBAT = {
   /** Only targets within this cone are considered for assist. */
   aimAssistConeDeg: 26,
   aimAssistMaxRange: 18,
+} as const;
+
+/**
+ * Weapon handling, wear and jamming (M2).
+ *
+ * Wear is deliberately slow and jams start only past a threshold: a weapon that
+ * could jam at any moment is just noise, one that jams when neglected teaches
+ * maintenance.
+ */
+export const WEAPON = {
+  /** Extra spread at zero durability, as a fraction of base spread. */
+  wearSpreadPenalty: 0.85,
+  /** Wear fraction below which a weapon never jams. */
+  jamWearThreshold: 0.45,
+  /** Jam chance per shot at total ruin, before ergonomics relief. */
+  jamChanceAtRuin: 0.16,
+  /** How much perfect ergonomics reduces the jam chance (0..1). */
+  jamErgonomicsRelief: 0.6,
+  /** Seconds to clear a jam. Long enough to hurt, short enough to survive. */
+  jamClearSeconds: 1.6,
+
+  /** Degrees of accumulated spread shed per second at 0 / 100 ergonomics. */
+  bloomRecoveryMin: 4,
+  bloomRecoveryMax: 13,
+
+  /** Repair cost per durability point, in credits. */
+  repairCostPerPoint: 9,
+  /** Fraction of maximum durability permanently lost per repair. */
+  repairWearPenalty: 0.06,
+} as const;
+
+/**
+ * Penetration versus armour (M2).
+ *
+ * A round's penetration is compared against the target's effective armour
+ * class. Around the break-even point the outcome is a coin flip, which keeps
+ * marginal ammunition genuinely tense rather than simply "works" or "does not".
+ */
+export const ARMOR = {
+  /** Penetration value one armour class is worth. */
+  penetrationPerClass: 11,
+  /** Penetration spread over which the chance goes from 0 to 1. */
+  penetrationWindow: 26,
+  /** Durability lost when armour stops a round. */
+  durabilityPerBlock: 3.2,
+  /** Durability lost when a round goes through. */
+  durabilityPerPenetration: 1.1,
+  /** Damage that still gets through a successful block, as a floor. */
+  minDamageThroughArmor: 0.12,
+  /** Armour keeps only this share of its class at zero durability. */
+  ruinedClassFactor: 0.25,
+} as const;
+
+/** Hit zone damage multipliers and base weighting (M2). */
+export const HIT_ZONES = {
+  headMultiplier: 2.6,
+  torsoMultiplier: 1,
+  limbsMultiplier: 0.72,
+  /** Unaware targets are easier to hit well. */
+  unawareHeadBonusWeight: 6,
+} as const;
+
+/** Throwables and melee (M2). */
+export const THROWABLE = {
+  /** Seconds the throw animation locks the player. */
+  windupSeconds: 0.25,
+  /** Minimum throw distance, so a tap never drops it at your feet. */
+  minRange: 2,
+  /** Metres a frag's noise carries. */
+  fragNoiseRadius: 30,
+  flashNoiseRadius: 22,
+} as const;
+
+export const MELEE = {
+  damage: 34,
+  /** Multiplier against a target that has not noticed you. */
+  unawareMultiplier: 3.2,
+  range: 1.5,
+  /** Half-angle of the attack arc, in degrees. */
+  arcDeg: 55,
+  cooldownSeconds: 0.75,
+  /** Metres the swing carries. Quiet by design - this is the stealth option. */
+  noiseRadius: 3,
 } as const;
 
 export const AI = {

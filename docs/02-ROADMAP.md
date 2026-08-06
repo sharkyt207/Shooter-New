@@ -13,8 +13,8 @@ erst dann das nächste. Kein paralleles Anfangen von Baustellen.
 |---|-------------|----------|--------|
 | **M0** | Fundament | Toolchain, Architektur, Core-Layer, Boundary-Check | ✅ abgeschlossen |
 | **M1** | Vertical Slice / Prototyp | Spielbarer Raid-Loop End-to-End | ✅ abgeschlossen |
-| **M2** | Kampf & Waffen in Tiefe | Waffenmods, Ammo-Typen, Trefferzonen, Rückstoß | 🔜 als nächstes |
-| **M3** | Gegner & KI in Tiefe | Fraktionsverhalten, Squads, Bosse, Hören/Sehen | ⏳ geplant |
+| **M2** | Kampf & Waffen in Tiefe | Munitionstypen, Panzerungsklassen, Trefferzonen, Aufsätze, Wurfgeschosse, Nahkampf | ✅ abgeschlossen |
+| **M3** | Gegner & KI in Tiefe | Fraktionsverhalten, Squads, Bosse, Hören/Sehen | 🔜 als nächstes |
 | **M4** | Welt & Anomalien | Fragment-Generator v2, alle 5 Anomalien, Wetter/Licht | ⏳ geplant |
 | **M5** | Meta: Basis, Crafting, Economy | Basisausbau, Werkbänke, Händler, Schwarzmarkt | ⏳ geplant |
 | **M6** | Mobile-Härtung | Capacitor, iOS-Build, Performance-Pass, Touch-Politur | ⏳ geplant |
@@ -63,23 +63,41 @@ Modul-Dokumentation unter `docs/modules/`.
 
 ---
 
-## M2 — Kampf & Waffen (nächster Schritt)
+## M2 — Kampf & Waffen ✅
 
-- Waffenmodifikationen (Lauf, Visier, Magazin, Schalldämpfer) mit Stat-Deltas
-- Munitionstypen (Penetration vs. Schaden vs. Fragmentierung)
-- Trefferzonen & Rüstungs-Layer (Kopf/Torso/Gliedmaßen)
-- Rückstoß-Muster, Waffen-Handling-Stats (Ergonomie, ADS-Zeit)
-- Nahkampf & Wurfgeschosse (Splitter, Blender, Echo-Köder)
-- Waffen-Haltbarkeit und Ladehemmung
-- **Doku:** `docs/modules/combat.md`, `docs/modules/weapons.md` erweitern
+**Leitgedanke:** Ein Schuss ist keine Zahl mehr. Was geladen ist, was der Gegner
+trägt, wo es trifft, was montiert ist und wie abgenutzt die Waffe ist — jeder
+dieser Faktoren ist eine Entscheidung vor dem Raid.
 
-## M3 — Gegner & KI
+- [x] Waffenmodifikationen (Lauf, Visier, Magazin, Schalldämpfer, Kompensator)
+      mit Stat-Deltas — kein Aufsatz ist ein reiner Vorteil
+- [x] Munitionstypen: 7 Ladungen über 3 Kaliber, Durchschlag ↔ Schaden ↔
+      Fragmentierung als Zielkonflikt; Vollgeschoss macht aus der Schrotwaffe
+      eine Mittelstreckenwaffe
+- [x] Trefferzonen (gewichtet nach Waffenklasse) und Panzerung nach Klasse mit
+      zonenabhängiger Deckung, plus Helm als eigener Slot
+- [x] Waffen-Handling: Ergonomie steuert Streuungsabbau
+- [x] Nahkampf (Schleichoption mit ×3,2 im Hinterhalt) und drei Wurfgeschosse
+      (Splitter, Blender, Echo-Köder)
+- [x] Haltbarkeit, Ladehemmung ab Verschleißschwelle, Instandsetzung mit
+      sinkendem Höchstzustand
+- [x] Werkstatt-Bildschirm mit Delta-Anzeige je Aufsatz
+- [x] **Doku:** `docs/modules/combat.md`
+
+**Bewusst verschoben:** Rückstoß als Ziel-Impuls. Auf Twin-Stick würde ein
+Zielversatz gegen den Daumen des Spielers arbeiten; das lässt sich ohne Test auf
+echter Hardware nicht seriös tunen (M6). Bis dahin bleibt Rückstoß als
+Streuungsaufbau modelliert, gedämpft durch Ergonomie.
+
+## M3 — Gegner & KI (nächster Schritt)
 
 - Squad-Koordination (Flankieren, Deckungsfeuer, Rückzug)
 - Fraktionsspezifische Profile & Beziehungen untereinander
 - Hörsystem mit Materialdämpfung, Schalldämpfer-Interaktion
 - Boss: „Wächter" mit Phasen und einzigartigem Loot
 - Nav-Grid mit Flow-Fields statt naivem Steering
+- Fraktions-Feindschaft: Streuner und Orden bekämpfen einander
+- Gegner nutzen die M2-Werkzeuge selbst (Granaten, unterschiedliche Munition)
 - **Doku:** `docs/modules/ai.md`
 
 ## M4 — Welt & Anomalien

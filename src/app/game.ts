@@ -20,6 +20,8 @@ import {
   type PlayerProfile,
 } from '@/game/base/profile';
 import { craft } from '@/game/crafting/crafting';
+import { fitAttachment, repairWeapon } from '@/game/base/workshop';
+import type { AttachmentSlot } from '@/content/types';
 import {
   buyItem,
   commitLoadout,
@@ -53,6 +55,7 @@ import { createLoadoutScreen } from '@/ui/screens/loadoutScreen';
 import { createMainMenuScreen } from '@/ui/screens/mainMenuScreen';
 import { createPauseOverlay } from '@/ui/screens/pauseOverlay';
 import { createResultScreen } from '@/ui/screens/resultScreen';
+import { createWorkshopScreen } from '@/ui/screens/workshopScreen';
 import { GameStateMachine } from './gameStateMachine';
 import { buildHudViewModel, type HudViewModel } from '@/ui/viewModel';
 
@@ -173,6 +176,7 @@ export class Game {
       this.intent.sprint = state.sprint;
       this.intent.reload = state.reload;
       this.intent.interact = state.interact;
+      if (state.melee) this.intent.melee = true;
 
       sim.applyIntent(this.intent);
       this.clock.advance(dt, () => sim.step());
@@ -308,11 +312,35 @@ export class Game {
 
         onEquip: (slot, itemId) => {
           const key =
-            slot === 'weapon' ? 'weaponItemId' : slot === 'armor' ? 'armorItemId' : 'backpackItemId';
+            slot === 'weapon'
+              ? 'weaponItemId'
+              : slot === 'armor'
+                ? 'armorItemId'
+                : slot === 'helmet'
+                  ? 'helmetItemId'
+                  : 'backpackItemId';
+
+          // Changing the weapon invalidates its fittings and its condition -
+          // the attachments belong to the gun that left, not to the new one.
+          if (key === 'weaponItemId' && itemId !== this.profile.loadout.weaponItemId) {
+            this.returnAttachmentsToStash();
+            this.profile.loadout.preferredAmmoItemId = null;
+            this.profile.loadout.weaponCondition = 1;
+            this.profile.weaponRepairs = 0;
+          }
+
           this.profile.loadout[key] = itemId;
           void this.saveProfile();
           this.showLoadoutScreen();
         },
+
+        onSelectAmmo: (itemId) => {
+          this.profile.loadout.preferredAmmoItemId = itemId;
+          void this.saveProfile();
+          this.showLoadoutScreen();
+        },
+
+        onOpenWorkshop: () => this.showWorkshopScreen(),
 
         onCarryChange: (itemId, delta) => {
           this.changeCarried(itemId, delta);
@@ -327,6 +355,55 @@ export class Game {
         },
       }),
     );
+  }
+
+  private showWorkshopScreen(): void {
+    this.ui.setScreen(
+      createWorkshopScreen(this.profile, {
+        onBack: () => this.showLoadoutScreen(),
+
+        onFit: (slot, attachmentId) => {
+          const result = fitAttachment(this.profile, slot, attachmentId);
+          if (!result.ok) {
+            this.ui.toast(
+              result.reason === 'notInStash'
+                ? 'Teil nicht im Lager.'
+                : result.reason === 'moduleTooLow'
+                  ? 'Werkbank zu niedrig.'
+                  : 'Passt nicht.',
+            );
+            return;
+          }
+          void this.saveProfile();
+          this.showWorkshopScreen();
+        },
+
+        onRepair: () => {
+          const result = repairWeapon(this.profile);
+          if (!result.ok) {
+            this.ui.toast(
+              result.reason === 'notEnoughCredits'
+                ? 'Nicht genug Credits.'
+                : result.reason === 'moduleTooLow'
+                  ? 'Werkbank Stufe 2 nötig.'
+                  : 'Nichts instandzusetzen.',
+            );
+            return;
+          }
+          this.ui.toast(`Instandgesetzt für ${result.cost} ¢.`);
+          void this.saveProfile();
+          this.showWorkshopScreen();
+        },
+      }),
+    );
+  }
+
+  /** Pull every fitted attachment back into the stash. */
+  private returnAttachmentsToStash(): void {
+    for (const slot of Object.keys(this.profile.loadout.attachments) as AttachmentSlot[]) {
+      fitAttachment(this.profile, slot, null);
+    }
+    this.profile.loadout.attachments = {};
   }
 
   private showBriefingScreen(): void {
@@ -378,6 +455,12 @@ export class Game {
       onPause: () => this.openPause(),
       onUseItem: (itemId) => {
         this.intent.useItemId = itemId;
+      },
+      onThrowItem: (itemId) => {
+        this.intent.throwItemId = itemId;
+      },
+      onMelee: () => {
+        this.intent.melee = true;
       },
     });
 
@@ -492,6 +575,7 @@ export class Game {
             loot: [],
             retainedShards: 0,
             zoneName: null,
+            weaponCondition: this.profile.loadout.weaponCondition,
           });
           void this.saveProfile();
           this.states.transitionTo('result');

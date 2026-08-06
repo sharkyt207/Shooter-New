@@ -103,7 +103,10 @@ function dropEnemyLoot(
   const weapon = weaponState ? findWeapon(weaponState.weaponId) : undefined;
   if (weapon && weaponState) {
     const rounds = Math.floor(weaponState.magazine * LOOT.enemyAmmoDropFactor);
-    if (rounds > 0) rolled.push({ itemId: weapon.ammoItemId, quantity: rounds });
+    // Whatever was actually chambered drops - killing an Order runner carrying
+    // armour-piercing rounds is a real prize.
+    const ammoId = weaponState.loadedAmmoItemId ?? weapon.defaultAmmoItemId;
+    if (rounds > 0) rolled.push({ itemId: ammoId, quantity: rounds });
   }
 
   for (let i = 0; i < rolled.length; i++) {

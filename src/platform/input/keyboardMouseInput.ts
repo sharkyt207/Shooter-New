@@ -17,7 +17,7 @@ export class KeyboardMouseInput implements InputSource {
   private mouseX = 0;
   private mouseY = 0;
   private mouseDown = false;
-  private oneShots = { toggleInventory: false, pause: false, reload: false };
+  private oneShots = { toggleInventory: false, pause: false, reload: false, melee: false };
 
   /**
    * Where the player is on screen, in CSS pixels. The aim vector is the offset
@@ -84,6 +84,7 @@ export class KeyboardMouseInput implements InputSource {
     out.reload = this.oneShots.reload;
     out.toggleInventory = this.oneShots.toggleInventory;
     out.pause = this.oneShots.pause;
+    out.melee = this.oneShots.melee;
 
     return out;
   }
@@ -92,6 +93,7 @@ export class KeyboardMouseInput implements InputSource {
     this.oneShots.toggleInventory = false;
     this.oneShots.pause = false;
     this.oneShots.reload = false;
+    this.oneShots.melee = false;
   }
 
   private held(...codes: string[]): boolean {
@@ -109,6 +111,7 @@ export class KeyboardMouseInput implements InputSource {
       if (event.code === 'KeyR') this.oneShots.reload = true;
       if (event.code === 'Tab') this.oneShots.toggleInventory = true;
       if (event.code === 'Escape') this.oneShots.pause = true;
+      if (event.code === 'KeyF') this.oneShots.melee = true;
     }
     this.keys.add(event.code);
   }

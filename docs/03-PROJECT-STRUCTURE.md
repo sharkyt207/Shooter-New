@@ -54,6 +54,8 @@ Shooter-New/
 │   │   ├── weapons.ts             # Waffen-Definitionen (+ WeaponId-Typ)
 │   │   ├── enemies.ts             # Gegner-Archetypen
 │   │   ├── lootTables.ts          # Gewichtete Loot-Tabellen
+│   │   ├── attachments.ts         # Waffenaufsätze mit Stat-Deltas
+│   │   ├── throwables.ts          # Wurfgeschosse
 │   │   ├── biomes.ts              # Fragment-Typen + Container-Definitionen
 │   │   ├── baseModules.ts         # Basisgebäude, Ausbaustufen, Crafting-Rezepte
 │   │   └── balance.ts             # ALLE Balance-Konstanten an einem Ort
@@ -69,15 +71,15 @@ Shooter-New/
 │   │   │   ├── factories.ts       # Bauplan je Entity-Art
 │   │   │   └── systems/           # Ein System = eine Datei = eine Aufgabe
 │   │   ├── player/                # Spieler-Erstellung, Zustand, Intents
-│   │   ├── combat/                # Projektile, Schaden, Tod
-│   │   ├── weapons/               # Feuerlogik, Magazin, Nachladen
+│   │   ├── combat/                # Ballistik, Schaden, Wurfgeschosse, Nahkampf
+│   │   ├── weapons/               # Feuerlogik, Stat-Auflösung, Verschleiß
 │   │   ├── inventory/             # Container, Gewicht, Ausrüsten
 │   │   ├── loot/                  # Loot-Erzeugung und Aufnahme
 │   │   ├── enemies/               # Spawning, Archetypen-Instanziierung
 │   │   ├── ai/                    # Wahrnehmung, FSM, Steering
 │   │   ├── extraction/            # Zonen, Verfügbarkeit, Halte-Timer
 │   │   ├── map/                   # Fragment-Generator, Kollisionsgitter
-│   │   ├── base/                  # Basiszustand und Ausbau
+│   │   ├── base/                  # Basiszustand, Ausbau, Werkstatt
 │   │   ├── economy/               # Währung, Händler, Preise
 │   │   ├── crafting/              # Rezeptausführung
 │   │   └── save/                  # Save-Schema, Migrationen, Serialisierung
@@ -99,7 +101,7 @@ Shooter-New/
 │   │   ├── uiRoot.ts              # Screen-Verwaltung, Lebenszyklus
 │   │   ├── components/            # Wiederverwendbare Bausteine (Button, Panel, List)
 │   │   ├── hud/                   # In-Raid-HUD, Minimap, Sticks
-│   │   ├── screens/               # MainMenu, Base, Loadout, Briefing, Result, …
+│   │   ├── screens/               # MainMenu, Base, Loadout, Workshop, Result, …
 │   │   ├── styles/                # CSS, Design-Tokens
 │   │   └── viewModel.ts           # Sim-Zustand → flaches UI-Snapshot
 │   │

@@ -40,6 +40,13 @@ export function aiSystem(ctx: SimContext): void {
     const transform = world.transforms.get(entity);
     if (!def || !transform) continue;
 
+    // Disoriented enemies stand still and shoot nothing - the window a
+    // flashbang buys is the whole reason to carry one.
+    if (world.disoriented.has(entity)) {
+      agent.burstRemaining = 0;
+      continue;
+    }
+
     agent.stateTime += ctx.dt;
     if (agent.attackCooldown > 0) agent.attackCooldown -= ctx.dt;
     if (agent.waitTimer > 0) agent.waitTimer -= ctx.dt;
