@@ -48,7 +48,10 @@ const launchOptions = process.env['CHROMIUM_PATH']
 
 const browser = await chromium.launch(launchOptions);
 // Landscape phone proportions - the target form factor, not a desktop window.
-const page = await browser.newPage({ viewport: { width: 900, height: 480 } });
+// The locale is pinned: since M7 the game picks its language from the browser,
+// and this script asserts on German strings. Pinning it keeps the assertion
+// honest instead of making the language auto-detection untestable.
+const page = await browser.newPage({ viewport: { width: 900, height: 480 }, locale: 'de-DE' });
 
 /**
  * A second pass on a real phone shape.
@@ -63,6 +66,7 @@ async function phonePass() {
     deviceScaleFactor: 3,
     hasTouch: true,
     isMobile: true,
+    locale: 'de-DE',
   });
   const phone = await context.newPage();
   const phoneErrors = [];
@@ -115,6 +119,49 @@ async function clickButton(text) {
   await button.waitFor({ state: 'visible', timeout: 10000 });
   await button.click();
   await page.waitForTimeout(700);
+}
+
+/**
+ * The same loop in English.
+ *
+ * Half a localisation is worse than none - a menu in two languages looks
+ * broken. This walks the flow using only English labels, so a missing
+ * translation on any screen in the path fails the run rather than being
+ * noticed by a player.
+ */
+async function englishPass() {
+  const context = await browser.newContext({ viewport: { width: 900, height: 480 }, locale: 'en-GB' });
+  const english = await context.newPage();
+  const englishErrors = [];
+  english.on('console', (msg) => {
+    if (msg.type() === 'error') englishErrors.push(`console.error: ${msg.text()}`);
+  });
+  english.on('pageerror', (error) => englishErrors.push(`pageerror: ${error.message}`));
+
+  const tap = async (text) => {
+    const button = english.locator(`button:has-text("${text}")`).first();
+    await button.waitFor({ state: 'visible', timeout: 15000 });
+    await button.click({ force: true });
+    await english.waitForTimeout(700);
+  };
+
+  await english.goto(URL_TARGET, { waitUntil: 'networkidle' });
+  await english.waitForTimeout(1200);
+  await tap('Enter the rift');     // menu -> base
+  await tap('Trade');
+  await tap('Workbench');
+  await tap('Base');
+  await tap('Stash');
+  await tap('Choose loadout');
+  await tap('Enter the rift');     // loadout -> briefing
+  await english.screenshot({ path: `${SHOT_DIR}/13-english-briefing.png` });
+  await tap('Enter the rift');     // briefing -> raid
+  await english.waitForTimeout(1800);
+  await english.screenshot({ path: `${SHOT_DIR}/14-english-raid.png` });
+  console.log(`  screenshot: ${SHOT_DIR}/14-english-raid.png`);
+
+  await context.close();
+  return englishErrors;
 }
 
 try {
@@ -191,6 +238,9 @@ try {
 
   console.log('  Telefon-Format 844x390');
   errors.push(...(await phonePass()));
+
+  console.log('  Englisch');
+  errors.push(...(await englishPass()));
 
   const frames = await page.evaluate(
     () =>

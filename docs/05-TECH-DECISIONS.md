@@ -301,3 +301,43 @@ ausschließlich per `await import()` geladen. Kein Modul außerhalb von
 **Konsequenzen.** Eine native Fähigkeit ist erst benutzbar, wenn sie einen
 Adapter hat — das ist Reibung, und sie ist beabsichtigt. Wer Capacitor eines
 Tages ersetzt, tauscht Dateien in `platform/native/`, sonst nichts.
+
+---
+
+## ADR-016 — Deutsch ist die Quellsprache, der Schlüssel ist der Quelltext
+
+**Status:** akzeptiert (M7)
+
+**Kontext.** Das Spiel ist auf Deutsch geschrieben: Menüs, Gegenstandsnamen,
+Anomalie-Beschreibungen, Questtexte. Für Englisch braucht es eine
+Übersetzungsschicht. Der Branchenstandard ist ein Katalog mit künstlichen
+Schlüsseln (`ui.loadout.confirm`) und **je Sprache** einer Datei — auch für die
+Sprache, in der der Text ursprünglich geschrieben wurde.
+
+**Entscheidung.** Der Katalog wird mit der **deutschen Zeichenkette selbst**
+geschlüsselt, gettext-Stil. `t('Ausrüstung wählen')` schlägt in `en.ts` nach und
+liefert bei fehlendem Eintrag den Aufrufparameter zurück. Für Deutsch existiert
+kein Katalog. Kollidierende Quellzeichenketten werden über einen `context`
+getrennt, dessen Schlüssel `context + U+0004 + source` lautet.
+
+**Begründung.**
+
+1. **Der schlimmste Fehlerfall wird harmlos.** Mit Kennungen zeigt ein fehlender
+   Eintrag `ui.base.title` auf dem Bildschirm — kaputt in *jeder* Sprache. Hier
+   zeigt er ein deutsches Wort in einem englischen Menü: ein Schönheitsfehler.
+2. **Aufrufstellen bleiben lesbar.** Ein Diff, in dem `t('Raid abbrechen')`
+   steht, ist prüfbar, ohne einen Katalog aufzuschlagen.
+3. **Eine Sprache dazu ist eine Datei.** Kein Umbenennen, keine
+   Schlüsseldisziplin, keine Abstimmung zwischen dem, der den Bildschirm
+   schreibt, und dem, der übersetzt.
+4. **Der Preis ist bezahlbar und maschinell überwacht.** Ändert sich der
+   deutsche Text, verwaist sein Eintrag — das ist der reale Nachteil. Ein Test
+   scannt jedes literale `t('…')` in `ui/` und `app/` gegen den Katalog und
+   findet genau das. Beim ersten Lauf fand er 40 Lücken.
+
+**Konsequenzen.** Übersetzt wird ausschließlich an der Grenze zur Darstellung —
+im View-Model und in `ui/`, **nie** in `game/**`, das keine Sprache kennt und
+nach ADR-002 keine kennen darf. Konsequenz daraus: Die Simulation liefert
+Bestandteile (Name, Menge), nicht fertige Sätze, sonst ließe sich die Sprache
+erst zwischen zwei Raids wechseln. Die gewählte Sprache liegt **außerhalb** des
+Profils, denn sie gehört zur Person, nicht zur Spielfigur.

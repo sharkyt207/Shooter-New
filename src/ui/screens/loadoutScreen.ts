@@ -23,6 +23,7 @@ import { insuranceAvailable, premiumFor, returnMinutes } from '@/game/economy/in
 import { mergeHudItems, toHudItems, type HudItem } from '@/ui/viewModel';
 import { bar, clear, el, formatCredits, formatWeight } from '@/ui/components/dom';
 import type { Screen } from '@/ui/uiRoot';
+import { t, tf } from '@/core/i18n/i18n';
 
 const INSURANCE_CHANCE = META.insuranceReturnChance;
 
@@ -50,7 +51,7 @@ export function createLoadoutScreen(profile: PlayerProfile, callbacks: LoadoutCa
   const weightBar = bar('weight');
   const confirmButton = el('button', {
     className: 'btn btn--go btn--block',
-    text: 'Riss betreten',
+    text: t('Riss betreten'),
     onClick: () => callbacks.onConfirm(),
   });
 
@@ -60,7 +61,7 @@ export function createLoadoutScreen(profile: PlayerProfile, callbacks: LoadoutCa
     const owned = mergeHudItems(toHudItems(profile.stash.slots));
 
     content.appendChild(
-      slotPanel('Waffe', 'weapon', profile.loadout.weaponItemId, owned.filter((i) => i.category === 'weapon'), callbacks),
+      slotPanel(t('Waffe'), 'weapon', profile.loadout.weaponItemId, owned.filter((i) => i.category === 'weapon'), callbacks),
     );
     const armorItems = owned.filter(
       (i) => i.category === 'armor' && (findItem(i.itemId)?.armor?.coverage ?? []).includes('torso'),
@@ -69,16 +70,16 @@ export function createLoadoutScreen(profile: PlayerProfile, callbacks: LoadoutCa
       (i) => i.category === 'armor' && (findItem(i.itemId)?.armor?.coverage ?? []).includes('head'),
     );
 
-    content.appendChild(slotPanel('Rüstung', 'armor', profile.loadout.armorItemId, armorItems, callbacks));
-    content.appendChild(slotPanel('Helm', 'helmet', profile.loadout.helmetItemId, helmetItems, callbacks));
+    content.appendChild(slotPanel(t('Rüstung'), 'armor', profile.loadout.armorItemId, armorItems, callbacks));
+    content.appendChild(slotPanel(t('Helm'), 'helmet', profile.loadout.helmetItemId, helmetItems, callbacks));
     content.appendChild(ammoPanel(profile, owned, callbacks));
     content.appendChild(
-      slotPanel('Rucksack', 'backpack', profile.loadout.backpackItemId, owned.filter((i) => i.category === 'backpack'), callbacks),
+      slotPanel(t('Rucksack'), 'backpack', profile.loadout.backpackItemId, owned.filter((i) => i.category === 'backpack'), callbacks),
     );
     content.appendChild(carryPanel(profile, owned, callbacks));
     content.appendChild(
       slotPanel(
-        'Sicherer Behälter',
+        t('Sicherer Behälter'),
         'secure',
         profile.loadout.secureContainerItemId,
         owned.filter((i) => i.category === 'container'),
@@ -113,12 +114,12 @@ export function createLoadoutScreen(profile: PlayerProfile, callbacks: LoadoutCa
         children: [
           el('div', {
             children: [
-              el('h1', { className: 'title', text: 'Ausrüstung' }),
-              el('div', { className: 'subtitle', text: 'Risiko' }),
+              el('h1', { className: 'title', text: t('Ausrüstung') }),
+              el('div', { className: 'subtitle', text: t('Risiko') }),
               riskLabel,
             ],
           }),
-          el('button', { className: 'btn btn--ghost', text: 'Zurück', onClick: () => callbacks.onBack() }),
+          el('button', { className: 'btn btn--ghost', text: t('Zurück'), onClick: () => callbacks.onBack() }),
         ],
       }),
       el('div', {
@@ -130,7 +131,7 @@ export function createLoadoutScreen(profile: PlayerProfile, callbacks: LoadoutCa
       el('div', { style: { height: 'var(--space-3)' } }),
       el('button', {
         className: 'btn btn--ghost btn--block',
-        text: 'Werkstatt öffnen',
+        text: t('Werkstatt öffnen'),
         onClick: () => callbacks.onOpenWorkshop(),
       }),
       el('div', { style: { height: 'var(--space-2)' } }),
@@ -161,17 +162,17 @@ function ammoPanel(
 
   const list = el('div', { className: 'item-list' });
   if (!weapon) {
-    list.appendChild(el('div', { className: 'muted', text: 'Erst eine Waffe wählen.' }));
+    list.appendChild(el('div', { className: 'muted', text: t('Erst eine Waffe wählen.') }));
     return el('div', {
       className: 'panel',
-      children: [el('div', { className: 'panel__title', text: 'Munition' }), list],
+      children: [el('div', { className: 'panel__title', text: t('Munition') }), list],
     });
   }
 
   const matching = owned.filter((item) => findItem(item.itemId)?.ammo?.caliber === weapon.caliber);
   if (matching.length === 0) {
     list.appendChild(
-      el('div', { className: 'muted', text: 'Keine passende Munition im Lager.' }),
+      el('div', { className: 'muted', text: t('Keine passende Munition im Lager.') }),
     );
   }
 
@@ -206,7 +207,7 @@ function ammoPanel(
 
   return el('div', {
     className: 'panel',
-    children: [el('div', { className: 'panel__title', text: 'Munition' }), list],
+    children: [el('div', { className: 'panel__title', text: t('Munition') }), list],
   });
 }
 
@@ -227,7 +228,7 @@ function slotPanel(
     el('div', {
       className: `item${equippedId === null ? ' item--selected' : ''}`,
       onClick: () => equip(null),
-      children: [el('div', { className: 'item__name muted', text: '— nichts —' })],
+      children: [el('div', { className: 'item__name muted', text: t('— nichts —') })],
     }),
   );
 
@@ -262,7 +263,7 @@ function carryPanel(
 
   const list = el('div', { className: 'item-list' });
   if (packable.length === 0) {
-    list.appendChild(el('div', { className: 'muted', text: 'Nichts zum Mitnehmen im Lager.' }));
+    list.appendChild(el('div', { className: 'muted', text: t('Nichts zum Mitnehmen im Lager.') }));
   }
 
   for (const item of packable) {
@@ -281,7 +282,7 @@ function carryPanel(
             className: 'grow',
             children: [
               el('div', { className: 'item__name', text: item.name }),
-              el('div', { className: 'item__meta', text: `Lager: ${available}` }),
+              el('div', { className: 'item__meta', text: tf('Lager: {count}', { count: available }) }),
             ],
           }),
           stepper('−', () => callbacks.onCarryChange(item.itemId, -step)),
@@ -294,7 +295,7 @@ function carryPanel(
 
   return el('div', {
     className: 'panel',
-    children: [el('div', { className: 'panel__title', text: 'Mitnehmen' }), list],
+    children: [el('div', { className: 'panel__title', text: t('Mitnehmen') }), list],
   });
 }
 
@@ -320,7 +321,7 @@ function securePanel(
   const packable = owned.filter((item) => item.category !== 'container');
 
   if (packable.length === 0) {
-    list.appendChild(el('div', { className: 'muted', text: 'Nichts im Lager.' }));
+    list.appendChild(el('div', { className: 'muted', text: t('Nichts im Lager.') }));
   }
 
   for (const item of packable) {
@@ -360,14 +361,14 @@ function securePanel(
       el('div', {
         className: 'row row--between',
         children: [
-          el('div', { className: 'panel__title', text: 'Im sicheren Behälter' }),
+          el('div', { className: 'panel__title', text: t('Im sicheren Behälter') }),
           el('div', {
             className: 'muted mono',
             text: `${formatWeight(used)} / ${formatWeight(capacity)}`,
           }),
         ],
       }),
-      el('div', { className: 'muted', text: 'Kommt zurück - auch wenn du es nicht tust.' }),
+      el('div', { className: 'muted', text: t('Kommt zurück - auch wenn du es nicht tust.') }),
       list,
     ],
   });
@@ -384,8 +385,8 @@ function insurancePanel(profile: PlayerProfile, callbacks: LoadoutCallbacks): HT
     return el('div', {
       className: 'panel',
       children: [
-        el('div', { className: 'panel__title', text: 'Versicherung' }),
-        el('div', { className: 'muted', text: 'Braucht das Modul Medizin.' }),
+        el('div', { className: 'panel__title', text: t('Versicherung') }),
+        el('div', { className: 'muted', text: t('Braucht das Modul Medizin.') }),
       ],
     });
   }
@@ -404,7 +405,7 @@ function insurancePanel(profile: PlayerProfile, callbacks: LoadoutCallbacks): HT
   return el('div', {
     className: 'panel',
     children: [
-      el('div', { className: 'panel__title', text: 'Versicherung' }),
+      el('div', { className: 'panel__title', text: t('Versicherung') }),
       el('div', {
         className: 'muted',
         text: `Getragene Ausrüstung kommt bei einem Fehlschlag mit ${Math.round(

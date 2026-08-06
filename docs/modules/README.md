@@ -21,6 +21,7 @@ implementiert, getestet, optimiert **und** hier dokumentiert ist
 | [platform-mobile.md](platform-mobile.md) | `platform/native`, `platform/input`, `platform/storage` | 🟡 M6 — Web fertig, native Builds brauchen einen Mac |
 | [audio.md](audio.md) | `platform/audio` | 🟢 M7 fertig |
 | [onboarding.md](onboarding.md) | `content/hints`, `game/base/onboarding` | 🟢 M7 fertig |
+| [i18n.md](i18n.md) | `core/i18n`, `content/locales` | 🟢 M7 fertig |
 
 ## Aufbau jeder Modul-Doku
 

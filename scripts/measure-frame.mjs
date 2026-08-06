@@ -30,7 +30,8 @@ const launchOptions = process.env['CHROMIUM_PATH']
   : {};
 
 const browser = await chromium.launch(launchOptions);
-const page = await browser.newPage({ viewport: { width: 900, height: 480 } });
+// German locale pinned: the navigation below clicks German button labels.
+const page = await browser.newPage({ viewport: { width: 900, height: 480 }, locale: 'de-DE' });
 
 // Instrument WebGL before any application code runs.
 await page.addInitScript(() => {

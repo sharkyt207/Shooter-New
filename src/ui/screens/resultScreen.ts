@@ -12,6 +12,7 @@ import type { SettlementReport } from '@/game/economy/trader';
 import { mergeHudItems, toHudItems } from '@/ui/viewModel';
 import { el, formatCredits, formatNumber, statRow } from '@/ui/components/dom';
 import type { Screen } from '@/ui/uiRoot';
+import { t, tf } from '@/core/i18n/i18n';
 
 export interface ResultCallbacks {
   onReturnToBase(): void;
@@ -38,17 +39,17 @@ export function createResultScreen(report: SettlementReport, callbacks: ResultCa
       el('div', {
         className: 'panel',
         children: [
-          el('div', { className: 'panel__title', text: 'Bilanz' }),
-          statRow('Dauer', formatClock(outcome.durationSeconds)),
-          statRow('Ausschaltungen', String(outcome.kills)),
-          statRow('Erfahrung', `+${formatNumber(outcome.xp)}`),
+          el('div', { className: 'panel__title', text: t('Bilanz') }),
+          statRow(t('Dauer'), formatClock(outcome.durationSeconds)),
+          statRow(t('Ausschaltungen'), String(outcome.kills)),
+          statRow(t('Erfahrung'), `+${formatNumber(outcome.xp)}`),
           success
-            ? statRow('Beutewert', formatCredits(outcome.lootValue))
-            : statRow('Verlust', 'gesamte mitgeführte Ausrüstung'),
+            ? statRow(t('Beutewert'), formatCredits(outcome.lootValue))
+            : statRow(t('Verlust'), t('gesamte mitgeführte Ausrüstung')),
           !success && outcome.retainedShards > 0
-            ? statRow('Gerettete Echo-Splitter', String(outcome.retainedShards))
+            ? statRow(t('Gerettete Echo-Splitter'), String(outcome.retainedShards))
             : null,
-          report.leveledUp ? statRow('Aufstieg', `Stufe ${report.newLevel}`) : null,
+          report.leveledUp ? statRow(t('Aufstieg'), tf('Stufe {level}', { level: report.newLevel })) : null,
         ].filter(Boolean) as HTMLElement[],
       }),
 
@@ -56,7 +57,7 @@ export function createResultScreen(report: SettlementReport, callbacks: ResultCa
         ? el('div', {
             className: 'panel',
             children: [
-              el('div', { className: 'panel__title', text: 'Gesichert' }),
+              el('div', { className: 'panel__title', text: t('Gesichert') }),
               el('div', {
                 className: 'item-list',
                 children: mergeHudItems(toHudItems(outcome.loot))
@@ -82,10 +83,10 @@ export function createResultScreen(report: SettlementReport, callbacks: ResultCa
             className: 'panel',
             style: { borderColor: 'var(--color-threat)' },
             children: [
-              el('div', { className: 'panel__title', text: 'Lager voll' }),
+              el('div', { className: 'panel__title', text: t('Lager voll') }),
               el('div', {
                 className: 'muted',
-                text: 'Diese Gegenstände passten nicht mehr ins Lager und gingen verloren. Lager ausbauen.',
+                text: t('Diese Gegenstände passten nicht mehr ins Lager und gingen verloren. Lager ausbauen.'),
               }),
               ...mergeHudItems(toHudItems(report.overflow)).map((item) =>
                 el('div', { className: 'muted', text: `${item.name} ×${item.quantity}` }),
@@ -98,7 +99,7 @@ export function createResultScreen(report: SettlementReport, callbacks: ResultCa
 
       el('button', {
         className: 'btn btn--primary btn--block',
-        text: 'Zurück zur Basis',
+        text: t('Zurück zur Basis'),
         onClick: () => callbacks.onReturnToBase(),
       }),
     ],
@@ -110,21 +111,23 @@ export function createResultScreen(report: SettlementReport, callbacks: ResultCa
 function titleFor(outcome: RaidOutcome): string {
   switch (outcome.kind) {
     case 'extracted':
-      return 'Extrahiert';
+      return t('Extrahiert');
     case 'died':
-      return 'Gefallen';
+      return t('Gefallen');
     case 'timeout':
-      return 'Verschollen';
+      return t('Verschollen');
   }
 }
 
 function subtitleFor(outcome: RaidOutcome): string {
   switch (outcome.kind) {
     case 'extracted':
-      return outcome.zoneName ? `über ${outcome.zoneName}` : 'Beute gesichert';
+      return outcome.zoneName
+        ? tf('über {zone}', { zone: t(outcome.zoneName) })
+        : t('Beute gesichert');
     case 'died':
-      return 'Der Riss hat behalten, was du getragen hast.';
+      return t('Der Riss hat behalten, was du getragen hast.');
     case 'timeout':
-      return 'Der Riss schloss sich, bevor du draußen warst.';
+      return t('Der Riss schloss sich, bevor du draußen warst.');
   }
 }

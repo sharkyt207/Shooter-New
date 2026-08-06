@@ -7,6 +7,7 @@
  */
 
 import { el } from './components/dom';
+import { t } from '@/core/i18n/i18n';
 
 export interface Screen {
   readonly root: HTMLElement;
@@ -72,10 +73,10 @@ export class UiRoot {
         className: 'orientation-notice',
         children: [
           el('div', { className: 'orientation-notice__icon', text: '⟳' }),
-          el('div', { className: 'title', text: 'Bitte drehen' }),
+          el('div', { className: 'title', text: t('Bitte drehen') }),
           el('div', {
             className: 'muted',
-            text: 'PROJECT ECHO wird im Querformat gespielt.',
+            text: t('PROJECT ECHO wird im Querformat gespielt.'),
           }),
         ],
       });

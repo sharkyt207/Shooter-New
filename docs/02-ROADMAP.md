@@ -18,7 +18,7 @@ erst dann das nächste. Kein paralleles Anfangen von Baustellen.
 | **M4** | Welt & Anomalien | Fragment-Generator v2, alle 5 Anomalien, Wetter/Licht | ✅ fertig |
 | **M5** | Meta: Basis, Crafting, Economy | Basisausbau, Werkbänke, Händler, Schwarzmarkt | ✅ fertig |
 | **M6** | Mobile-Härtung | Capacitor, Performance-Pass, Touch-Politur | 🟡 Web fertig, native Builds brauchen einen Mac |
-| **M7** | Content & Art-Pass | Audio, Onboarding, erste echte Assets, Store-Texte | 🟡 Lokalisierung offen |
+| **M7** | Content & Art-Pass | Audio, Onboarding, Lokalisierung DE/EN, erste echte Assets, Store-Texte | ✅ fertig |
 | **M8** | Live-Vorbereitung | Telemetrie, Balancing-Tools, optional PvP-Modul, Store-Release | ⏳ geplant |
 
 ---
@@ -232,7 +232,7 @@ bleiben.
 
 **Doku:** `docs/modules/platform-mobile.md`
 
-## M7 — Content & Art-Pass 🟡
+## M7 — Content & Art-Pass ✅
 
 **Ziel:** Das Spiel hört auf, wie ein Prototyp zu klingen und auszusehen.
 
@@ -241,6 +241,7 @@ bleiben.
 | Audio | WebAudio-Adapter mit **prozeduraler** Synthese: 26 Stimmen, Ambience mit Drift, Positionston, Kompressor, Stimmenlimit, Autoplay-Entsperrung |
 | Ton im Spiel | Schüsse nach Waffenklasse, Einschläge, Tod, Alarm, Nachladen, Ladehemmung, Anomalien, Türen, Extraktion — und ein Klick für jeden Knopf |
 | Onboarding | 13 Hinweise, die auf die **Situation** feuern, einmal für immer, mit Prioritäts-Warteschlange |
+| Lokalisierung | Deutsch + Englisch vollständig; Deutsch ist Quellsprache, der Schlüssel ist der deutsche Satz (ADR-016); Umschalten mitten im Raid |
 | Erste echten Assets | Riss-Emblem aus Canva, über das Manifest geladen — Hauptmenü und App-Icon aus einer Quelle |
 | Store-Auftritt | `docs/10-STORE-LISTING.md`: Beschreibung, Schlüsselwörter, Altersfreigabe-Begründung, Screenshot-Plan |
 
@@ -251,12 +252,32 @@ bleiben.
 Genau das, was ADR-008 seit M0 versprochen hatte, jetzt an einem realen Asset
 nachgewiesen. Dieselbe Datei ist das App-Icon (`resources/icon.png`).
 
-**Eine Korrektur an dieser Roadmap**
+**Eine Korrektur an dieser Roadmap, und ihre Erledigung**
 
 Der M7-Eintrag behauptete „Strings sind ab Tag 1 zentralisiert". Das war
-falsch: Die Texte stehen deutsch und direkt in den Bildschirmen. Die
-Lokalisierung ist damit kein Nachziehen, sondern eine echte Extraktion über
-alle Screens — sie steht noch aus und ist der Grund, warum M7 auf 🟡 steht.
+falsch: Die Texte standen deutsch und direkt in den Bildschirmen. Die
+Lokalisierung war damit kein Nachziehen, sondern eine echte Extraktion über
+alle Screens — rund 113 Aufrufstellen in `ui/` und `app/` plus jeder Name aus
+`content/`, der auf einem Bildschirm landet.
+
+Erledigt, und zwar so, dass sie nicht wieder verrottet: Der Abdeckungstest fand
+beim ersten Lauf **40 nicht übersetzte Aufrufstellen**, Browser-Screenshots
+danach noch einmal Biomnamen, Bedrohungsstufen und zwei Zählformen. Der
+Smoke-Test läuft jetzt einen kompletten englischen Durchgang Menü → Basis →
+Ausrüstung → Briefing → Raid.
+
+**Gefundene und behobene Fehler dieses Meilensteins**
+
+- **Die Simulation baute Sätze.** Das Interaktionsziel lieferte
+  `"Feldverband ×3"` fertig zusammengesetzt an die Oberfläche. Damit hätte sich
+  die Sprache nur zwischen zwei Raids wechseln lassen. Jetzt liefert es Name und
+  Menge getrennt (ADR-002).
+- **Das Kontext-Trennzeichen war mehrdeutig.** Bei einfacher Verkettung ergaben
+  `("toas", "tX")` und `("toast", "X")` denselben Schlüssel. Jetzt U+0004, wie
+  bei gettext.
+- **Die automatische Spracherkennung riss den Smoke-Test.** Headless Chromium
+  meldet en-US, also stand da „Enter the rift". Richtiges Verhalten, falscher
+  Test: Die Skripte pinnen die Sprache jetzt auf `de-DE`.
 
 **Was Canva liefern konnte und was nicht**
 
@@ -269,13 +290,16 @@ selbst, mit echter Schrift.
 Ein transparenter PNG-Export braucht einen kostenpflichtigen Canva-Plan; der
 Hintergrund wird stattdessen im CSS per `screen` und Radialmaske entfernt.
 
-**Offen in M7**
+**Doku:** `docs/modules/audio.md`, `docs/modules/onboarding.md`,
+`docs/modules/i18n.md`
 
-- **Lokalisierung DE/EN** — Extraktion aller Strings, siehe oben
+**Bewusst nicht in M7**
+
 - Finale Spielgrafik (Figma/Substance): braucht eine Gestalterin, nicht einen
   Generator. Die Pipeline dafür steht und ist nachgewiesen.
 - Materialabhängige Schritte und adaptive Musik
 - Trailer, Splash-Screen (2732×2732), Play-Symbolbild
+- Englische Store-Texte (`docs/10-STORE-LISTING.md` ist deutsch)
 
 ## M8 — Live-Vorbereitung
 

@@ -10,6 +10,7 @@ import { findItem } from '@/content/items';
 import { mergeHudItems, type HudItem, type HudViewModel } from '@/ui/viewModel';
 import { bar, clear, el, formatCredits, formatWeight } from '@/ui/components/dom';
 import type { Screen } from '@/ui/uiRoot';
+import { t } from '@/core/i18n/i18n';
 
 export interface InventoryCallbacks {
   onClose(): void;
@@ -45,7 +46,7 @@ export function createInventoryOverlay(
       actions.appendChild(
         el('button', {
           className: 'btn btn--primary grow',
-          text: 'Benutzen',
+          text: t('Benutzen'),
           onClick: () => {
             callbacks.onUse(selected as string);
             callbacks.onClose();
@@ -61,7 +62,7 @@ export function createInventoryOverlay(
       actions.appendChild(
         el('button', {
           className: 'btn btn--go grow',
-          text: 'Sichern',
+          text: t('Sichern'),
           onClick: () => {
             callbacks.onSecure(selected as string);
             render();
@@ -73,7 +74,7 @@ export function createInventoryOverlay(
     actions.appendChild(
       el('button', {
         className: 'btn btn--danger grow',
-        text: 'Ablegen',
+        text: t('Ablegen'),
         onClick: () => {
           const item = mergeHudItems(getViewModel().inventory).find((i) => i.itemId === selected);
           callbacks.onDrop(selected as string, item?.quantity ?? 1);
@@ -90,7 +91,7 @@ export function createInventoryOverlay(
 
     clear(list);
     if (items.length === 0) {
-      list.appendChild(el('div', { className: 'muted', text: 'Der Rucksack ist leer.' }));
+      list.appendChild(el('div', { className: 'muted', text: t('Der Rucksack ist leer.') }));
     }
 
     for (const item of items) {
@@ -133,7 +134,7 @@ export function createInventoryOverlay(
     children: (['value', 'weight', 'name'] as SortMode[]).map((mode) =>
       el('button', {
         className: 'btn btn--ghost grow',
-        text: mode === 'value' ? 'Wert' : mode === 'weight' ? 'Gewicht' : 'Name',
+        text: mode === 'value' ? t('Wert') : mode === 'weight' ? t('Gewicht') : t('Name'),
         style: { minHeight: '36px', fontSize: '0.78rem' },
         onClick: () => {
           sortMode = mode;
@@ -151,14 +152,14 @@ export function createInventoryOverlay(
         children: [
           el('div', {
             children: [
-              el('h1', { className: 'title', text: 'Rucksack' }),
-              el('div', { className: 'subtitle', text: 'Beutewert' }),
+              el('h1', { className: 'title', text: t('Rucksack') }),
+              el('div', { className: 'subtitle', text: t('Beutewert') }),
               valueLabel,
             ],
           }),
           el('button', {
             className: 'btn btn--ghost',
-            text: 'Schließen',
+            text: t('Schließen'),
             onClick: () => callbacks.onClose(),
           }),
         ],

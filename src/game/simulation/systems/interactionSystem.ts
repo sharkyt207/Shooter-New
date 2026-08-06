@@ -65,7 +65,8 @@ function findNearestTarget(ctx: SimContext, x: number, y: number): InteractionTa
     best = {
       entity,
       kind: 'loot',
-      label: def ? `${def.name}${drop.quantity > 1 ? ` ×${drop.quantity}` : ''}` : drop.itemId,
+      label: def?.name ?? drop.itemId,
+      quantity: drop.quantity,
       progress: 0,
       distance: Math.sqrt(distSq),
     };
@@ -86,6 +87,7 @@ function findNearestTarget(ctx: SimContext, x: number, y: number): InteractionTa
       entity,
       kind: 'container',
       label: def?.name ?? 'Behälter',
+      quantity: 1,
       progress: def ? container.searchProgress / def.searchSeconds : 0,
       distance: Math.sqrt(distSq),
     };

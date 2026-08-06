@@ -14,6 +14,7 @@ import type { HudViewModel } from '@/ui/viewModel';
 import type { TouchInput } from '@/platform/input/touchInput';
 import { bar, clear, el, formatWeight, type BarHandle } from '@/ui/components/dom';
 import { Minimap } from './minimap';
+import { t, tf } from '@/core/i18n/i18n';
 
 export interface HudCallbacks {
   onInventory(): void;
@@ -93,7 +94,7 @@ export class Hud {
     });
     this.context.style.display = 'none';
 
-    this.extractionLabel = el('div', { className: 'subtitle', text: 'Extraktion' });
+    this.extractionLabel = el('div', { className: 'subtitle', text: t('Extraktion') });
     this.extractionBar = bar('extraction');
     this.extraction = el('div', {
       className: 'hud__extraction',
@@ -131,7 +132,7 @@ export class Hud {
     this.lightBtn = el('button', {
       className: 'hud__icon-btn hud__icon-btn--light',
       text: '☀',
-      attrs: { 'aria-label': 'Licht' },
+      attrs: { 'aria-label': t('Licht') },
       data: { uiControl: 'true' },
       onClick: () => this.callbacks.onToggleLight(),
     });
@@ -165,14 +166,14 @@ export class Hud {
             el('button', {
               className: 'hud__icon-btn',
               text: '▤',
-              attrs: { 'aria-label': 'Inventar' },
+              attrs: { 'aria-label': t('Inventar') },
               data: { uiControl: 'true' },
               onClick: () => this.callbacks.onInventory(),
             }),
             el('button', {
               className: 'hud__icon-btn',
               text: '❚❚',
-              attrs: { 'aria-label': 'Pause' },
+              attrs: { 'aria-label': t('Pause') },
               data: { uiControl: 'true' },
               onClick: () => this.callbacks.onPause(),
             }),
@@ -200,24 +201,24 @@ export class Hud {
       children: [
         el('button', {
           className: 'hud__btn hud__btn--interact',
-          text: 'Nehmen',
+          text: t('Nehmen'),
           onHold: (pressed) => this.touch.setButton('interact', pressed),
         }),
         el('button', {
           className: 'hud__btn',
-          text: 'Laden',
+          text: t('Laden'),
           data: { uiControl: 'true' },
           onClick: () => this.touch.setButton('reload', true),
         }),
         el('button', {
           className: 'hud__btn',
-          text: 'Sprint',
+          text: t('Sprint'),
           onHold: (pressed) => this.touch.setButton('sprint', pressed),
         }),
         el('button', {
           className: 'hud__btn hud__btn--melee',
-          text: 'Nah',
-          attrs: { 'aria-label': 'Nahkampf' },
+          text: t('Nah'),
+          attrs: { 'aria-label': t('Nahkampf') },
           data: { uiControl: 'true' },
           onClick: () => this.callbacks.onMelee(),
         }),
@@ -298,7 +299,7 @@ export class Hud {
       this.last.ammoText = 'jammed';
       clear(this.ammo);
       this.ammo.appendChild(el('span', { className: 'is-empty', text: '— — —' }));
-      this.ammo.appendChild(el('small', { text: ' Signal gestört' }));
+      this.ammo.appendChild(el('small', { text: t(' Signal gestört') }));
       return;
     }
 
@@ -315,11 +316,11 @@ export class Hud {
     // A jam is the single most urgent thing on screen when it happens: the
     // weapon simply will not fire until it is cleared.
     if (vm.jammed) {
-      this.ammo.appendChild(el('span', { className: 'is-empty', text: 'LADEHEMMUNG' }));
+      this.ammo.appendChild(el('span', { className: 'is-empty', text: t('LADEHEMMUNG') }));
       return;
     }
     if (vm.reloading) {
-      this.ammo.appendChild(el('span', { className: 'subtitle', text: `Nachladen ${text}` }));
+      this.ammo.appendChild(el('span', { className: 'subtitle', text: tf('Nachladen {progress}', { progress: text }) }));
       return;
     }
 
@@ -334,7 +335,7 @@ export class Hud {
       this.ammo.appendChild(
         el('small', {
           style: { color: vm.weaponCondition < 0.3 ? 'var(--color-danger)' : 'var(--color-threat)' },
-          text: ` · Zustand ${Math.round(vm.weaponCondition * 100)} %`,
+          text: ` · ${tf('Zustand {percent} %', { percent: Math.round(vm.weaponCondition * 100) })}`,
         }),
       );
     }

@@ -37,7 +37,17 @@ export type InteractionKind = 'loot' | 'container';
 export interface InteractionTarget {
   entity: EntityId;
   kind: InteractionKind;
+  /**
+   * Untranslated name of the thing.
+   *
+   * The simulation has no locale and must not have one (ADR-002): it reports
+   * *what* the target is, and the view model composes the label the player
+   * reads. Handing a finished sentence across that boundary would mean the
+   * language could only change between raids.
+   */
   label: string;
+  /** Quantity, when the target is a stack of loot. Composed by the view model. */
+  quantity: number;
   /** 0..1 progress of an in-flight container search. */
   progress: number;
   distance: number;

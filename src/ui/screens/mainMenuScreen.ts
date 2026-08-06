@@ -10,6 +10,7 @@ import { levelFromXp } from '@/game/base/profile';
 import { assetUrl } from '@/ui/assets/uiAssets';
 import { el, formatCredits } from '@/ui/components/dom';
 import type { Screen } from '@/ui/uiRoot';
+import { t, tf } from '@/core/i18n/i18n';
 
 export interface MainMenuCallbacks {
   onContinue(): void;
@@ -37,7 +38,7 @@ export function createMainMenuScreen(
           el('h1', { className: 'title title--brand', text: 'Project Echo' }),
           el('p', {
             className: 'subtitle',
-            text: 'Die Realität ist zerbrochen. Geh hinein. Komm zurück.',
+            text: t('Die Realität ist zerbrochen. Geh hinein. Komm zurück.'),
           }),
         ],
       }),
@@ -47,16 +48,16 @@ export function createMainMenuScreen(
         children: [
           el('button', {
             className: 'btn btn--primary btn--block',
-            text: hasHistory ? 'Fortsetzen' : 'Riss betreten',
+            text: hasHistory ? t('Fortsetzen') : t('Riss betreten'),
             onClick: () => callbacks.onContinue(),
           }),
           hasHistory
             ? el('button', {
                 className: 'btn btn--ghost btn--block',
-                text: 'Neues Profil',
+                text: t('Neues Profil'),
                 onClick: () => {
                   // Destructive and irreversible - it must be confirmed.
-                  if (globalThis.confirm?.('Profil wirklich zurücksetzen? Lager und Fortschritt gehen verloren.')) {
+                  if (globalThis.confirm?.(t('Profil wirklich zurücksetzen? Lager und Fortschritt gehen verloren.'))) {
                     callbacks.onNewProfile();
                   }
                 },
@@ -70,18 +71,18 @@ export function createMainMenuScreen(
             className: 'panel',
             style: { width: 'min(88vw, 340px)' },
             children: [
-              el('div', { className: 'panel__title', text: 'Operator' }),
-              row('Stufe', String(levelFromXp(profile.xp))),
-              row('Guthaben', formatCredits(profile.credits)),
-              row('Raids', String(stats.raidsStarted)),
-              row('Extraktionen', String(stats.extractions)),
-              row('Verluste', String(stats.deaths)),
-              row('Bester Fund', formatCredits(stats.bestHaul)),
+              el('div', { className: 'panel__title', text: t('Operator') }),
+              row(t('Stufe'), String(levelFromXp(profile.xp))),
+              row(t('Guthaben'), formatCredits(profile.credits)),
+              row(t('Raids'), String(stats.raidsStarted)),
+              row(t('Extraktionen'), String(stats.extractions)),
+              row(t('Verluste'), String(stats.deaths)),
+              row(t('Bester Fund'), formatCredits(stats.bestHaul)),
             ],
           })
         : null,
 
-      el('div', { className: 'muted', text: `Version ${version} · Meilenstein M7` }),
+      el('div', { className: 'muted', text: tf('Version {version} · Meilenstein {milestone}', { version, milestone: 'M7' }) }),
     ],
   });
 

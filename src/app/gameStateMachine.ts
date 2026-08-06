@@ -68,6 +68,18 @@ export class GameStateMachine {
     return true;
   }
 
+  /**
+   * Rebuild the current screen without changing state.
+   *
+   * Used when something outside the state machine invalidates what is drawn -
+   * a language change, for instance. Deliberately not `transitionTo(current)`,
+   * which is a no-op by design.
+   */
+  reenter(): void {
+    this.handlers.get(this.state)?.exit?.();
+    this.handlers.get(this.state)?.enter?.();
+  }
+
   update(dt: number): void {
     this.handlers.get(this.state)?.update?.(dt);
   }

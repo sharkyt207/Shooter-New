@@ -16,6 +16,7 @@ import type { PlayerProfile } from '@/game/base/profile';
 import { resolveWeapon, type ResolvedWeapon } from '@/game/weapons/weaponStats';
 import { bar, el, formatCredits, statRow } from '@/ui/components/dom';
 import type { Screen } from '@/ui/uiRoot';
+import { t, tf } from '@/core/i18n/i18n';
 
 export interface WorkshopCallbacks {
   onBack(): void;
@@ -36,7 +37,7 @@ export function createWorkshopScreen(
     content.appendChild(
       el('div', {
         className: 'panel',
-        children: [el('div', { className: 'muted', text: 'Keine Waffe ausgerüstet.' })],
+        children: [el('div', { className: 'muted', text: t('Keine Waffe ausgerüstet.') })],
       }),
     );
   } else {
@@ -63,11 +64,11 @@ export function createWorkshopScreen(
         children: [
           el('div', {
             children: [
-              el('h1', { className: 'title', text: 'Werkstatt' }),
+              el('h1', { className: 'title', text: t('Werkstatt') }),
               el('div', { className: 'subtitle', text: weapon?.name ?? 'ohne Waffe' }),
             ],
           }),
-          el('button', { className: 'btn btn--ghost', text: 'Zurück', onClick: () => callbacks.onBack() }),
+          el('button', { className: 'btn btn--ghost', text: t('Zurück'), onClick: () => callbacks.onBack() }),
         ],
       }),
       content,
@@ -82,14 +83,14 @@ function statsPanel(name: string, resolved: ResolvedWeapon): HTMLElement {
     className: 'panel',
     children: [
       el('div', { className: 'panel__title', text: name }),
-      statRow('Schaden', `${resolved.damage.toFixed(1)} × ${resolved.pellets}`),
-      statRow('Durchschlag', resolved.penetration.toFixed(0)),
-      statRow('Magazin', String(resolved.magazineSize)),
-      statRow('Streuung', `${resolved.spreadDeg.toFixed(2)}°`),
-      statRow('Reichweite', `${resolved.effectiveRange.toFixed(0)} / ${resolved.maxRange.toFixed(0)} m`),
-      statRow('Nachladen', `${resolved.reloadSeconds.toFixed(2)} s`),
-      statRow('Lärmradius', `${resolved.noiseRadius.toFixed(0)} m`),
-      statRow('Ergonomie', resolved.ergonomics.toFixed(0)),
+      statRow(t('Schaden'), `${resolved.damage.toFixed(1)} × ${resolved.pellets}`),
+      statRow(t('Durchschlag'), resolved.penetration.toFixed(0)),
+      statRow(t('Magazin'), String(resolved.magazineSize)),
+      statRow(t('Streuung'), `${resolved.spreadDeg.toFixed(2)}°`),
+      statRow(t('Reichweite'), `${resolved.effectiveRange.toFixed(0)} / ${resolved.maxRange.toFixed(0)} m`),
+      statRow(t('Nachladen'), `${resolved.reloadSeconds.toFixed(2)} s`),
+      statRow(t('Lärmradius'), `${resolved.noiseRadius.toFixed(0)} m`),
+      statRow(t('Ergonomie'), resolved.ergonomics.toFixed(0)),
       statRow(
         'Ladehemmung',
         resolved.jamChance <= 0 ? 'keine' : `${(resolved.jamChance * 100).toFixed(1)} % pro Schuss`,
@@ -118,7 +119,7 @@ function conditionPanel(profile: PlayerProfile, callbacks: WorkshopCallbacks): H
   return el('div', {
     className: 'panel',
     children: [
-      el('div', { className: 'panel__title', text: 'Zustand' }),
+      el('div', { className: 'panel__title', text: t('Zustand') }),
       el('div', {
         className: 'row',
         children: [
@@ -131,7 +132,9 @@ function conditionPanel(profile: PlayerProfile, callbacks: WorkshopCallbacks): H
         style: { marginTop: 'var(--space-2)' },
         // The permanent ceiling is the point of the mechanic, so it is stated
         // plainly rather than discovered.
-        text: `Jede Instandsetzung senkt den erreichbaren Höchstzustand. Aktuell maximal ${Math.round(ceiling * 100)} %.`,
+        text: tf('Jede Instandsetzung senkt den erreichbaren Höchstzustand. Aktuell maximal {percent} %.', {
+          percent: Math.round(ceiling * 100),
+        }),
       }),
       repairButton,
     ],
@@ -153,7 +156,7 @@ function slotPanel(
     el('div', {
       className: `item${fittedId === null ? ' item--selected' : ''}`,
       onClick: () => callbacks.onFit(slot, null),
-      children: [el('div', { className: 'item__name muted', text: '— leer —' })],
+      children: [el('div', { className: 'item__name muted', text: t('— leer —') })],
     }),
   );
 
@@ -185,7 +188,7 @@ function slotPanel(
 
   if (entries.length === 0) {
     list.appendChild(
-      el('div', { className: 'muted', text: 'Keine passenden Teile im Lager.' }),
+      el('div', { className: 'muted', text: t('Keine passenden Teile im Lager.') }),
     );
   }
 

@@ -7,6 +7,7 @@
  */
 
 import { RAID } from '@/content/balance';
+import { t } from '@/core/i18n/i18n';
 import { findEnemy } from '@/content/enemies';
 import { findItem } from '@/content/items';
 import { findWeapon } from '@/content/weapons';
@@ -173,7 +174,7 @@ export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
     const targetTick = zone.phase === 'locked' ? zone.opensAtTick : zone.closesAtTick;
     zones.push({
       zoneId: zone.zoneId,
-      name: zone.name,
+      name: t(zone.name),
       x: zoneTransform.x,
       y: zoneTransform.y,
       phase: zone.phase,
@@ -197,7 +198,7 @@ export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
     capacity: inventory?.capacityKg ?? 0,
     carriedValue: inventory ? totalValue(inventory) : 0,
 
-    weaponName: weaponDef?.name ?? 'Unbewaffnet',
+    weaponName: weaponDef ? t(weaponDef.name) : t('Unbewaffnet'),
     magazine: weaponState?.magazine ?? 0,
     magazineSize: weaponDef?.magazineSize ?? 0,
     reserveAmmo: reserveAmmoFor(inventory, weaponState?.loadedAmmoItemId ?? weaponDef?.defaultAmmoItemId ?? null),
@@ -209,14 +210,16 @@ export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
 
     remainingSeconds: sim.remainingSeconds,
 
-    interactionLabel: interaction?.label ?? null,
+    interactionLabel: interaction
+      ? t(interaction.label) + (interaction.quantity > 1 ? ` ×${interaction.quantity}` : '')
+      : null,
     interactionProgress: interaction?.progress ?? 0,
 
     extractionActive: holding !== undefined,
     extractionProgress: holding ? holding.holdProgress / RAID.extractionHoldSeconds : 0,
-    extractionZoneName: holding?.name ?? null,
+    extractionZoneName: holding ? t(holding.name) : null,
 
-    usingItemLabel: usingItem ? (findItem(usingItem.itemId)?.name ?? null) : null,
+    usingItemLabel: usingItem ? t(findItem(usingItem.itemId)?.name ?? '') || null : null,
     usingItemProgress: usingItem ? 1 - usingItem.remaining / usingItem.total : 0,
 
     jammed: (weaponState?.jamRemaining ?? 0) > 0,
@@ -225,7 +228,7 @@ export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
         ? weaponState.durability / weaponState.durabilityMax
         : 1,
     ammoName: weaponState?.loadedAmmoItemId
-      ? (findItem(weaponState.loadedAmmoItemId)?.name ?? null)
+      ? t(findItem(weaponState.loadedAmmoItemId)?.name ?? '') || null
       : null,
 
     playerX: transform?.x ?? 0,
@@ -235,7 +238,7 @@ export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
     boss: findEngagedBoss(sim),
     hudJammed: sim.hudJammed,
     lightOn: sim.world.players.get(player)?.lightOn ?? false,
-    weatherName: sim.weather.name,
+    weatherName: t(sim.weather.name),
     weatherId: sim.weather.id,
     zones: sim.hudJammed ? [] : zones,
     inventory: inventory ? toHudItems(inventory.slots) : [],
@@ -274,7 +277,7 @@ function findEngagedBoss(sim: RaidSimulation): HudViewModel['boss'] {
     if (!health || health.current <= 0) continue;
 
     return {
-      name: def.name,
+      name: t(def.name),
       health: health.current,
       maxHealth: health.max,
       phase: agent.phaseLabel,
@@ -290,7 +293,9 @@ export function toHudItems(slots: readonly InventorySlot[]): HudItem[] {
     if (!def) continue;
     items.push({
       itemId: slot.itemId,
-      name: def.name,
+      // Translated here rather than at each of the ~20 places an item name is
+      // rendered. The view model is the boundary the UI already reads through.
+      name: t(def.name),
       quantity: slot.quantity,
       weight: def.weight * slot.quantity,
       value: def.value * slot.quantity,

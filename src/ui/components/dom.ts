@@ -1,3 +1,4 @@
+import { getLocale } from '@/core/i18n/i18n';
 /**
  * Tiny DOM helper.
  *
@@ -115,7 +116,9 @@ export function bar(variant: string): BarHandle {
 
 /** Format a number with a thousands separator, German style. */
 export function formatNumber(value: number): string {
-  return Math.round(value).toLocaleString('de-DE');
+  // Thousands separators differ: 8.000 in German, 8,000 in English. Hardcoding
+  // one locale makes the other look like a typo.
+  return Math.round(value).toLocaleString(getLocale() === 'en' ? 'en-GB' : 'de-DE');
 }
 
 export function formatWeight(kg: number): string {

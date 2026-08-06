@@ -11,16 +11,18 @@
 
 import { el } from '@/ui/components/dom';
 import type { Screen } from '@/ui/uiRoot';
+import { AVAILABLE_LOCALES, t, type Locale } from '@/core/i18n/i18n';
 
 export interface PauseCallbacks {
   onResume(): void;
   onAbandon(): void;
   onToggleDebug(): void;
   onToggleHanded(): void;
+  onSelectLocale(locale: Locale): void;
 }
 
 export function createPauseOverlay(
-  state: { debug: boolean; leftHanded: boolean },
+  state: { debug: boolean; leftHanded: boolean; locale: Locale },
   callbacks: PauseCallbacks,
 ): Screen {
   const debugButton = el('button', {
@@ -46,24 +48,25 @@ export function createPauseOverlay(
   const root = el('div', {
     className: 'screen screen--overlay menu',
     children: [
-      el('h1', { className: 'title', text: 'Pause' }),
+      el('h1', { className: 'title', text: t('Pause') }),
       el('div', {
         className: 'menu__actions',
         children: [
           el('button', {
             className: 'btn btn--primary btn--block',
-            text: 'Weiter',
+            text: t('Weiter'),
             onClick: () => callbacks.onResume(),
           }),
           debugButton,
           handedButton,
+          languageRow(state.locale, callbacks),
           el('button', {
             className: 'btn btn--danger btn--block',
-            text: 'Raid abbrechen',
+            text: t('Raid abbrechen'),
             onClick: () => {
               if (
                 globalThis.confirm?.(
-                  'Raid abbrechen? Die gesamte mitgeführte Ausrüstung gilt als verloren.',
+                  t('Raid abbrechen? Die gesamte mitgeführte Ausrüstung gilt als verloren.'),
                 )
               ) {
                 callbacks.onAbandon();
@@ -75,7 +78,7 @@ export function createPauseOverlay(
       el('div', {
         className: 'muted',
         style: { maxWidth: '30ch', textAlign: 'center' },
-        text: 'Desktop: WASD bewegen · Maus zielen · Klick feuern · R laden · E interagieren · Tab Inventar',
+        text: t('Desktop: WASD bewegen · Maus zielen · Klick feuern · R laden · E interagieren · Tab Inventar'),
       }),
     ],
   });
@@ -83,6 +86,28 @@ export function createPauseOverlay(
   return { root };
 }
 
+/**
+ * Language, as a row of buttons rather than a cycling toggle.
+ *
+ * A player who cannot read the current language cannot read a button that says
+ * "Sprache: Deutsch" either. Both options are always visible and always written
+ * in their own language, so the right one is recognisable regardless of what
+ * the game is currently set to.
+ */
+function languageRow(active: Locale, callbacks: PauseCallbacks): HTMLElement {
+  return el('div', {
+    className: 'row',
+    style: { gap: 'var(--space-2)', width: '100%' },
+    children: AVAILABLE_LOCALES.map((locale) =>
+      el('button', {
+        className: `btn grow ${locale.id === active ? 'btn--primary' : 'btn--ghost'}`,
+        text: locale.label,
+        onClick: () => callbacks.onSelectLocale(locale.id),
+      }),
+    ),
+  });
+}
+
 function labelFor(name: string, active: boolean): string {
-  return `${name}: ${active ? 'an' : 'aus'}`;
+  return `${t(name)}: ${active ? t('an') : t('aus')}`;
 }

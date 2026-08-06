@@ -42,6 +42,7 @@ import { buyPriceOf, lockedStockFor, refusesItem, sellPriceOf, stockFor } from '
 import { mergeHudItems, toHudItems, type HudItem } from '@/ui/viewModel';
 import { bar, clear, el, formatCredits, formatWeight } from '@/ui/components/dom';
 import type { Screen } from '@/ui/uiRoot';
+import { t, tf } from '@/core/i18n/i18n';
 
 export interface BaseCallbacks {
   onStartLoadout(): void;
@@ -77,10 +78,10 @@ export function createBaseScreen(profile: PlayerProfile, callbacks: BaseCallback
   };
 
   for (const [tab, label] of [
-    ['stash', 'Lager'],
-    ['trader', 'Handel'],
-    ['workbench', 'Werkbank'],
-    ['modules', 'Basis'],
+    ['stash', t('Lager')],
+    ['trader', t('Handel')],
+    ['workbench', t('Werkbank')],
+    ['modules', t('Basis')],
   ] as Array<[Tab, string]>) {
     tabs.appendChild(
       el('button', {
@@ -128,8 +129,8 @@ export function createBaseScreen(profile: PlayerProfile, callbacks: BaseCallback
         children: [
           el('div', {
             children: [
-              el('h1', { className: 'title', text: 'Basis' }),
-              el('div', { className: 'subtitle', text: `Stufe ${levelFromXp(profile.xp)}` }),
+              el('h1', { className: 'title', text: t('Basis') }),
+              el('div', { className: 'subtitle', text: tf('Stufe {level}', { level: levelFromXp(profile.xp) }) }),
             ],
           }),
           creditsLabel,
@@ -143,7 +144,7 @@ export function createBaseScreen(profile: PlayerProfile, callbacks: BaseCallback
       el('div', { style: { height: 'var(--space-3)' } }),
       el('button', {
         className: 'btn btn--go btn--block',
-        text: 'Ausrüstung wählen',
+        text: t('Ausrüstung wählen'),
         onClick: () => callbacks.onStartLoadout(),
       }),
     ],
@@ -184,8 +185,8 @@ function renderQuest(profile: PlayerProfile): HTMLElement {
     return el('div', {
       className: 'panel',
       children: [
-        el('div', { className: 'panel__title', text: QUEST_LINE_NAME }),
-        el('div', { className: 'muted', text: 'Die Karte ist vollständig. Vorerst.' }),
+        el('div', { className: 'panel__title', text: t(QUEST_LINE_NAME) }),
+        el('div', { className: 'muted', text: t('Die Karte ist vollständig. Vorerst.') }),
       ],
     });
   }
@@ -197,9 +198,9 @@ function renderQuest(profile: PlayerProfile): HTMLElement {
     className: 'panel',
     style: { borderColor: 'var(--color-echo)' },
     children: [
-      el('div', { className: 'panel__title', text: QUEST_LINE_NAME }),
-      el('div', { className: 'item__name', text: stage.name }),
-      el('div', { className: 'muted', text: stage.description }),
+      el('div', { className: 'panel__title', text: t(QUEST_LINE_NAME) }),
+      el('div', { className: 'item__name', text: t(stage.name) }),
+      el('div', { className: 'muted', text: t(stage.description) }),
       el('div', { style: { height: 'var(--space-2)' } }),
       progress.root,
       el('div', {
@@ -234,7 +235,7 @@ function renderStash(profile: PlayerProfile): HTMLElement {
 
   const list = el('div', { className: 'item-list' });
   if (items.length === 0) {
-    list.appendChild(el('div', { className: 'muted', text: 'Das Lager ist leer.' }));
+    list.appendChild(el('div', { className: 'muted', text: t('Das Lager ist leer.') }));
   }
   for (const item of items) list.appendChild(itemRow(item));
 
@@ -242,7 +243,7 @@ function renderStash(profile: PlayerProfile): HTMLElement {
     el('div', {
       className: 'row row--between',
       children: [
-        el('div', { className: 'panel__title', text: 'Lager' }),
+        el('div', { className: 'panel__title', text: t('Lager') }),
         el('div', {
           className: 'muted mono',
           text: `${formatWeight(weight)} / ${formatWeight(profile.stash.capacityKg)}`,
@@ -256,7 +257,7 @@ function renderStash(profile: PlayerProfile): HTMLElement {
   // player will have next raid, and it stops a loss feeling final.
   if (profile.insuranceReturns.length > 0) {
     children.push(
-      el('div', { className: 'panel__title', text: 'Versicherung unterwegs' }),
+      el('div', { className: 'panel__title', text: t('Versicherung unterwegs') }),
       el('div', {
         className: 'item-list',
         children: profile.insuranceReturns.map((entry) =>
@@ -290,7 +291,7 @@ function renderTraders(
     picker.appendChild(
       el('button', {
         className: `btn grow ${id === traderId ? 'btn--primary' : 'btn--ghost'}`,
-        text: findTrader(id)?.name ?? id,
+        text: t(findTrader(id)?.name ?? id),
         onClick: () => onSelectTrader(id),
       }),
     );
@@ -310,7 +311,7 @@ function renderTraders(
       tradeRow(
         item.name,
         `${item.quantity}× · ${formatCredits(sellPriceOf(profile, item.itemId, traderId))}`,
-        'Verkaufen',
+        t('Verkaufen'),
         item.rarity,
         () => callbacks.onSell(item.itemId, 1, traderId),
       ),
@@ -320,7 +321,10 @@ function renderTraders(
     sellList.appendChild(
       el('div', {
         className: 'muted',
-        text: owned.length === 0 ? 'Nichts zu verkaufen.' : `${def?.name} kauft davon nichts.`,
+        text:
+          owned.length === 0
+            ? t('Nichts zu verkaufen.')
+            : tf('{trader} kauft davon nichts.', { trader: t(def?.name ?? '') }),
       }),
     );
   }
@@ -334,7 +338,7 @@ function renderTraders(
       tradeRow(
         item.name,
         formatCredits(price),
-        'Kaufen',
+        t('Kaufen'),
         item.rarity,
         () => callbacks.onBuy(stock.itemId, quantityStep(item), traderId),
         profile.credits < price,
@@ -348,7 +352,7 @@ function renderTraders(
         style: { opacity: '0.45' },
         children: [
           el('div', { className: 'item__name grow', text: nameOf(locked.itemId) }),
-          el('div', { className: 'item__meta', text: `Ruf ${locked.tier}` }),
+          el('div', { className: 'item__meta', text: tf('Ruf {tier}', { tier: locked.tier }) }),
         ],
       }),
     );
@@ -361,16 +365,19 @@ function renderTraders(
       el('div', {
         className: 'panel',
         children: [
-          el('div', { className: 'panel__title', text: def?.name ?? 'Händler' }),
-          el('div', { className: 'muted', text: def?.blurb ?? '' }),
+          el('div', { className: 'panel__title', text: t(def?.name ?? 'Händler') }),
+          el('div', { className: 'muted', text: t(def?.blurb ?? '') }),
           el('div', {
             className: 'row row--between',
             style: { marginTop: 'var(--space-2)' },
             children: [
-              el('div', { className: 'mono', text: `Ruf ${tier}` }),
+              el('div', { className: 'mono', text: tf('Ruf {tier}', { tier }) }),
               el('div', {
                 className: 'muted mono',
-                text: toNext === null ? 'höchste Stufe' : `noch ${Math.ceil(toNext)}`,
+                text:
+                  toNext === null
+                    ? t('höchste Stufe')
+                    : tf('noch {points}', { points: Math.ceil(toNext) }),
               }),
             ],
           }),
@@ -379,11 +386,11 @@ function renderTraders(
       renderContracts(profile, traderId, callbacks),
       el('div', {
         className: 'panel',
-        children: [el('div', { className: 'panel__title', text: 'Verkaufen' }), sellList],
+        children: [el('div', { className: 'panel__title', text: t('Verkaufen') }), sellList],
       }),
       el('div', {
         className: 'panel',
-        children: [el('div', { className: 'panel__title', text: 'Angebot' }), buyList],
+        children: [el('div', { className: 'panel__title', text: t('Angebot') }), buyList],
       }),
     ],
   });
@@ -401,8 +408,8 @@ function renderContracts(
     return el('div', {
       className: 'panel',
       children: [
-        el('div', { className: 'panel__title', text: 'Aufträge' }),
-        el('div', { className: 'muted', text: 'Zurzeit nichts zu erledigen.' }),
+        el('div', { className: 'panel__title', text: t('Aufträge') }),
+        el('div', { className: 'muted', text: t('Zurzeit nichts zu erledigen.') }),
       ],
     });
   }
@@ -417,7 +424,7 @@ function renderContracts(
 
     const button = el('button', {
       className: `btn ${ready && !active.completed ? 'btn--primary' : 'btn--ghost'}`,
-      text: active.completed ? 'Erledigt' : 'Abgeben',
+      text: active.completed ? t('Erledigt') : t('Abgeben'),
       style: { minHeight: '34px', padding: '4px 10px', fontSize: '0.78rem' },
       onClick: () => callbacks.onCompleteContract(template.id),
     });
@@ -431,12 +438,12 @@ function renderContracts(
           el('div', {
             className: 'grow',
             children: [
-              el('div', { className: 'item__name', text: template.name }),
+              el('div', { className: 'item__name', text: t(template.name) }),
               el('div', { className: 'item__meta', text: detail }),
               el('div', {
                 className: 'item__meta',
                 style: { color: 'var(--color-threat)' },
-                text: `${formatCredits(template.rewardCredits)} · ${template.rewardXp} XP · Ruf +${template.rewardReputation}`,
+                text: `${formatCredits(template.rewardCredits)} · ${template.rewardXp} XP · ${tf('Ruf +{points}', { points: template.rewardReputation })}`,
               }),
             ],
           }),
@@ -448,7 +455,7 @@ function renderContracts(
 
   return el('div', {
     className: 'panel',
-    children: [el('div', { className: 'panel__title', text: 'Aufträge' }), list],
+    children: [el('div', { className: 'panel__title', text: t('Aufträge') }), list],
   });
 }
 
@@ -463,7 +470,7 @@ function renderWorkbench(
   // be doing.
   const queue = el('div', { className: 'item-list' });
   if (profile.crafts.length === 0) {
-    queue.appendChild(el('div', { className: 'muted', text: 'Nichts in Arbeit.' }));
+    queue.appendChild(el('div', { className: 'muted', text: t('Nichts in Arbeit.') }));
   }
   for (const job of profile.crafts) {
     const progress = bar('context');
@@ -492,7 +499,7 @@ function renderWorkbench(
         el('div', {
           className: 'row row--between',
           children: [
-            el('div', { className: 'panel__title', text: 'In Arbeit' }),
+            el('div', { className: 'panel__title', text: t('In Arbeit') }),
             el('div', {
               className: 'muted mono',
               text: `${profile.crafts.length} / ${craftSlots(profile)}`,
@@ -509,7 +516,7 @@ function renderWorkbench(
 
   if (recipes.length === 0) {
     list.appendChild(
-      el('div', { className: 'muted', text: 'Keine Rezepte verfügbar. Werkbank ausbauen.' }),
+      el('div', { className: 'muted', text: t('Keine Rezepte verfügbar. Werkbank ausbauen.') }),
     );
   }
 
@@ -526,9 +533,9 @@ function renderWorkbench(
 
     list.appendChild(
       tradeRow(
-        recipe.name,
+        t(recipe.name),
         meta,
-        'Bauen',
+        t('Bauen'),
         'common',
         () => callbacks.onCraft(recipe.id),
         !hasInputs(profile, recipe) || profile.crafts.length >= craftSlots(profile),
@@ -539,7 +546,7 @@ function renderWorkbench(
   children.push(
     el('div', {
       className: 'panel',
-      children: [el('div', { className: 'panel__title', text: 'Werkbank' }), list],
+      children: [el('div', { className: 'panel__title', text: t('Werkbank') }), list],
     }),
   );
 
@@ -563,10 +570,10 @@ function renderModules(
     const missing = next ? unmetRequirements(profile, next) : [];
 
     const children: HTMLElement[] = [
-      el('div', { className: 'module__name', text: def.name }),
+      el('div', { className: 'module__name', text: t(def.name) }),
       el('div', {
         className: 'module__level',
-        text: level === 0 ? 'Nicht gebaut' : `Stufe ${level}`,
+        text: level === 0 ? t('Nicht gebaut') : tf('Stufe {level}', { level }),
       }),
     ];
 
@@ -574,13 +581,13 @@ function renderModules(
       const progress = bar('context');
       progress.set(buildProgress(job, now));
       children.push(
-        el('div', { className: 'muted', text: 'Im Bau' }),
+        el('div', { className: 'muted', text: t('Im Bau') }),
         progress.root,
         el('div', { className: 'mono', text: formatDuration(secondsRemaining(job, now)) }),
       );
     } else if (!next) {
       children.push(
-        el('div', { className: 'muted', text: 'Maximale Stufe' }),
+        el('div', { className: 'muted', text: t('Maximale Stufe') }),
         el('div', { className: 'mono', style: { color: 'var(--text-muted)' }, text: '—' }),
       );
     } else if (missing.length > 0) {
@@ -589,13 +596,15 @@ function renderModules(
       children.push(
         el('div', {
           className: 'muted',
-          text: missing.map((entry) => `${entry.name} Stufe ${entry.level}`).join(', '),
+          text: missing
+            .map((entry) => tf('{module} Stufe {level}', { module: t(entry.name), level: entry.level }))
+            .join(', '),
         }),
-        el('div', { className: 'mono', style: { color: 'var(--text-muted)' }, text: 'gesperrt' }),
+        el('div', { className: 'mono', style: { color: 'var(--text-muted)' }, text: t('gesperrt') }),
       );
     } else {
       children.push(
-        el('div', { className: 'muted', text: next.unlocks }),
+        el('div', { className: 'muted', text: t(next.unlocks) }),
         el('div', {
           className: 'mono',
           style: { color: 'var(--color-threat)' },
@@ -619,7 +628,7 @@ function renderModules(
 
   return el('div', {
     className: 'panel',
-    children: [el('div', { className: 'panel__title', text: 'Ausbau' }), grid],
+    children: [el('div', { className: 'panel__title', text: t('Ausbau') }), grid],
   });
 }
 

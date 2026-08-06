@@ -15,6 +15,7 @@ import { seedSignature } from '@/core/math/random';
 import type { GeneratedMap } from '@/game/map/mapGenerator';
 import { el, statRow } from '@/ui/components/dom';
 import type { Screen } from '@/ui/uiRoot';
+import { t, tf } from '@/core/i18n/i18n';
 
 export interface BriefingCallbacks {
   onBack(): void;
@@ -39,7 +40,7 @@ export function createBriefingScreen(
         children: [
           el('div', {
             children: [
-              el('h1', { className: 'title', text: 'Riss-Signatur' }),
+              el('h1', { className: 'title', text: t('Riss-Signatur') }),
               el('div', {
                 className: 'title mono',
                 style: { color: 'var(--color-echo)', letterSpacing: '0.3em' },
@@ -47,21 +48,21 @@ export function createBriefingScreen(
               }),
             ],
           }),
-          el('button', { className: 'btn btn--ghost', text: 'Zurück', onClick: () => callbacks.onBack() }),
+          el('button', { className: 'btn btn--ghost', text: t('Zurück'), onClick: () => callbacks.onBack() }),
         ],
       }),
 
       el('div', {
         className: 'panel',
         children: [
-          el('div', { className: 'panel__title', text: 'Fragmente' }),
+          el('div', { className: 'panel__title', text: t('Fragmente') }),
           ...map.biomeNames.map((name, index) =>
             el('div', {
               className: 'row',
               style: { gap: 'var(--space-3)', padding: 'var(--space-1) 0' },
               children: [
                 el('span', { className: 'mono muted', text: String(index + 1).padStart(2, '0') }),
-                el('span', { text: name }),
+                el('span', { text: t(name) }),
               ],
             }),
           ),
@@ -71,20 +72,31 @@ export function createBriefingScreen(
       el('div', {
         className: 'panel',
         children: [
-          el('div', { className: 'panel__title', text: 'Lagebild' }),
-          statRow('Bedrohung', threat),
-          statRow('Wetter', map.weather.name),
-          statRow('Behälter erfasst', String(map.containers.length)),
-          statRow('Anomalien', map.anomalies.length > 0 ? `${map.anomalies.length} aktiv` : 'keine'),
+          el('div', { className: 'panel__title', text: t('Lagebild') }),
+          statRow(t('Bedrohung'), threat),
+          statRow(t('Wetter'), t(map.weather.name)),
+          statRow(t('Behälter erfasst'), String(map.containers.length)),
           statRow(
-            'Verschlossen',
-            lockedDoors > 0 ? `${lockedDoors} Kammer${lockedDoors > 1 ? 'n' : ''}` : 'keine',
+            t('Anomalien'),
+            map.anomalies.length > 0
+              ? tf('{count} aktiv', { count: map.anomalies.length })
+              : t('keine'),
           ),
-          statRow('Ausgänge', String(map.extractions.length)),
-          statRow('Dauer', formatClock(RAID.durationSeconds)),
           statRow(
-            'Erster Ausgang',
-            `nach ${formatClock(RAID.firstExtractionAtSeconds)}`,
+            t('Verschlossen'),
+            // Plurals differ by language, so each form is its own source
+            // string rather than a suffix glued on in code.
+            lockedDoors === 0
+              ? t('keine')
+              : lockedDoors === 1
+                ? tf('{count} Kammer', { count: lockedDoors })
+                : tf('{count} Kammern', { count: lockedDoors }),
+          ),
+          statRow(t('Ausgänge'), String(map.extractions.length)),
+          statRow(t('Dauer'), formatClock(RAID.durationSeconds)),
+          statRow(
+            t('Erster Ausgang'),
+            tf('nach {time}', { time: formatClock(RAID.firstExtractionAtSeconds) }),
           ),
         ],
       }),
@@ -92,8 +104,8 @@ export function createBriefingScreen(
       el('div', {
         className: 'panel',
         children: [
-          el('div', { className: 'panel__title', text: 'Bedingungen' }),
-          el('div', { className: 'muted', text: map.weather.briefing }),
+          el('div', { className: 'panel__title', text: t('Bedingungen') }),
+          el('div', { className: 'muted', text: t(map.weather.briefing) }),
         ],
       }),
 
@@ -105,7 +117,7 @@ export function createBriefingScreen(
             className: 'panel',
             style: { borderColor: 'var(--color-echo)' },
             children: [
-              el('div', { className: 'panel__title', text: 'Warnung' }),
+              el('div', { className: 'panel__title', text: t('Warnung') }),
               ...anomalyKinds.map((kind) =>
                 el('div', {
                   className: 'row',
@@ -113,9 +125,9 @@ export function createBriefingScreen(
                   children: [
                     el('span', {
                       style: { color: colorToCss(getAnomaly(kind).color), fontWeight: '600' },
-                      text: getAnomaly(kind).name,
+                      text: t(getAnomaly(kind).name),
                     }),
-                    el('span', { className: 'muted grow', text: getAnomaly(kind).description }),
+                    el('span', { className: 'muted grow', text: t(getAnomaly(kind).description) }),
                   ],
                 }),
               ),
@@ -130,12 +142,12 @@ export function createBriefingScreen(
         children: [
           el('button', {
             className: 'btn btn--go btn--block',
-            text: 'Riss betreten',
+            text: t('Riss betreten'),
             onClick: () => callbacks.onEnter(),
           }),
           el('button', {
             className: 'btn btn--ghost btn--block',
-            text: 'Andere Signatur suchen',
+            text: t('Andere Signatur suchen'),
             onClick: () => callbacks.onReroll(),
           }),
         ],
@@ -148,10 +160,10 @@ export function createBriefingScreen(
 
 /** Enemy count is the honest signal we have in M1; squads arrive in M3. */
 function describeThreat(enemyCount: number): string {
-  if (enemyCount <= 6) return 'gering';
-  if (enemyCount <= 12) return 'mittel';
-  if (enemyCount <= 20) return 'hoch';
-  return 'extrem';
+  if (enemyCount <= 6) return t('gering');
+  if (enemyCount <= 12) return t('mittel');
+  if (enemyCount <= 20) return t('hoch');
+  return t('extrem');
 }
 
 /** 0xRRGGBB to a CSS colour. The palette lives in content, not in the stylesheet. */

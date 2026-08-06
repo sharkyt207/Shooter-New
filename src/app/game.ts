@@ -51,6 +51,14 @@ import { isTouchDevice } from '@/platform/native/nativeBridge';
 import type { AudioService } from '@/platform/audio/audioService';
 import { createAudio } from '@/platform/audio/webAudio';
 import { setUiFeedback } from '@/ui/components/dom';
+import {
+  registerCatalogue,
+  setLocale,
+  t,
+  tf,
+  type Locale,
+} from '@/core/i18n/i18n';
+import { EN } from '@/content/locales/en';
 import { loadUiAssets } from '@/ui/assets/uiAssets';
 import { CompositeInput } from '@/platform/input/inputSource';
 import { KeyboardMouseInput } from '@/platform/input/keyboardMouseInput';
@@ -95,6 +103,9 @@ const CRAFT_MESSAGES: Record<CraftFailure, string> = {
   queueFull: 'Werkbank ausgelastet.',
 };
 
+/** Storage key for the chosen language. Deliberately outside the profile. */
+const LOCALE_KEY = 'locale';
+
 const log = createLogger('game');
 const VERSION = '0.1.0';
 
@@ -136,7 +147,11 @@ export class Game {
   /** Onboarding hints waiting for the banner to free up. */
   private readonly hintQueue: HintDef[] = [];
   private hintUntil = 0;
-  private readonly settings = { debug: false, leftHanded: false };
+  private readonly settings: { debug: boolean; leftHanded: boolean; locale: Locale } = {
+    debug: false,
+    leftHanded: false,
+    locale: 'de',
+  };
 
   constructor(private readonly options: GameOptions) {
     this.ui = new UiRoot(options.uiContainer);
@@ -151,7 +166,13 @@ export class Game {
   // ── Boot ─────────────────────────────────────────────────────────────────
 
   async start(): Promise<void> {
-    this.ui.showLoading('Riss wird kalibriert …');
+    this.ui.showLoading(t('Riss wird kalibriert …'));
+
+    // Language before anything draws, or the first screen renders in German and
+    // then flickers.
+    registerCatalogue('en', EN);
+    this.settings.locale = await this.loadLocale();
+    setLocale(this.settings.locale);
 
     // Native capabilities first: the save has to be read from the right place,
     // and a landscape lock applied before the first layout pass.
@@ -318,10 +339,10 @@ export class Game {
         onUpgrade: (moduleId) => {
           const result = startUpgrade(this.profile, moduleId, Date.now());
           if (!result.ok) {
-            this.ui.toast(BUILD_MESSAGES[result.reason ?? 'unknownModule']);
+            this.ui.toast(t(BUILD_MESSAGES[result.reason ?? 'unknownModule']));
             return;
           }
-          this.ui.toast(result.instant ? 'Ausgebaut.' : 'Bau begonnen.');
+          this.ui.toast(result.instant ? t('Ausgebaut.') : t('Bau begonnen.'));
           void this.saveProfile();
           this.showBaseScreen();
         },
@@ -329,11 +350,13 @@ export class Game {
         onSell: (itemId, quantity, traderId) => {
           const result = sellItem(this.profile, itemId, quantity, traderId);
           if (!result.ok) {
-            this.ui.toast(result.reason === 'refused' ? 'Das kauft er nicht.' : 'Nicht verfügbar.');
+            this.ui.toast(
+              result.reason === 'refused' ? t('Das kauft er nicht.') : t('Nicht verfügbar.'),
+            );
             return;
           }
           this.ui.toast(`+${result.credits} ¢`);
-          if (result.newTier) this.ui.toast(`Ruf gestiegen: Stufe ${result.newTier}`, 2200);
+          if (result.newTier) this.ui.toast(tf('Ruf gestiegen: Stufe {tier}', { tier: result.newTier }), 2200);
           void this.saveProfile();
           this.showBaseScreen();
         },
@@ -342,7 +365,7 @@ export class Game {
           const result = buyItem(this.profile, itemId, quantity, traderId);
           if (!result.ok) {
             this.ui.toast(
-              result.reason === 'notEnoughCredits' ? 'Nicht genug Credits.' : 'Lager voll.',
+              result.reason === 'notEnoughCredits' ? t('Nicht genug Credits.') : t('Lager voll.'),
             );
             return;
           }
@@ -353,10 +376,10 @@ export class Game {
         onCraft: (recipeId) => {
           const result = startCraft(this.profile, recipeId, Date.now());
           if (!result.ok) {
-            this.ui.toast(CRAFT_MESSAGES[result.reason ?? 'unknownRecipe']);
+            this.ui.toast(t(CRAFT_MESSAGES[result.reason ?? 'unknownRecipe']));
             return;
           }
-          this.ui.toast('In Arbeit.');
+          this.ui.toast(t('In Arbeit.'));
           void this.saveProfile();
           this.showBaseScreen();
         },
@@ -364,11 +387,11 @@ export class Game {
         onCompleteContract: (templateId) => {
           const result = completeContract(this.profile, templateId);
           if (!result.ok) {
-            this.ui.toast('Material fehlt.');
+            this.ui.toast(t('Material fehlt.'));
             return;
           }
-          this.ui.toast(`Auftrag erfüllt · +${result.credits} ¢`, 2200);
-          if (result.newTier) this.ui.toast(`Ruf gestiegen: Stufe ${result.newTier}`, 2200);
+          this.ui.toast(tf('Auftrag erfüllt · +{credits} ¢', { credits: result.credits ?? 0 }), 2200);
+          if (result.newTier) this.ui.toast(tf('Ruf gestiegen: Stufe {tier}', { tier: result.newTier }), 2200);
           void this.saveProfile();
           this.showBaseScreen();
         },
@@ -388,20 +411,28 @@ export class Game {
     let changed = false;
 
     for (const build of collectBuilds(this.profile, now)) {
-      this.ui.toast(`${build.moduleName} Stufe ${build.level} fertig.`, 2600);
+      this.ui.toast(
+        tf('{module} Stufe {level} fertig.', {
+          module: t(build.moduleName),
+          level: build.level,
+        }),
+        2600,
+      );
       changed = true;
     }
 
     for (const craft of collectCrafts(this.profile, now)) {
       this.ui.toast(
         craft.failed
-          ? `${craft.recipeName}: fehlgeschlagen, Material teilweise zurück.`
-          : `${craft.recipeName} fertiggestellt.`,
+          ? tf('{recipe}: fehlgeschlagen, Material teilweise zurück.', {
+              recipe: t(craft.recipeName),
+            })
+          : tf('{recipe} fertiggestellt.', { recipe: t(craft.recipeName) }),
         2600,
       );
       if (!craft.failed) {
         for (const completion of advanceQuest(this.profile, { crafted: 1 }, now)) {
-          this.ui.toast(`Auftrag abgeschlossen: ${completion.stage.name}`, 3000);
+          this.ui.toast(tf('Auftrag abgeschlossen: {stage}', { stage: t(completion.stage.name) }), 3000);
         }
       }
       changed = true;
@@ -409,7 +440,13 @@ export class Game {
 
     for (const entry of collectInsurance(this.profile, now)) {
       const def = findItem(entry.itemId);
-      this.ui.toast(`Versicherung: ${def?.name ?? entry.itemId} ×${entry.quantity}`, 2600);
+      this.ui.toast(
+        tf('Versicherung: {item} ×{count}', {
+          item: t(def?.name ?? entry.itemId),
+          count: entry.quantity,
+        }),
+        2600,
+      );
       changed = true;
     }
 
@@ -417,7 +454,7 @@ export class Game {
     // whenever the base changed.
     if (changed) {
       for (const completion of advanceQuest(this.profile, {}, now)) {
-        this.ui.toast(`Auftrag abgeschlossen: ${completion.stage.name}`, 3000);
+        this.ui.toast(tf('Auftrag abgeschlossen: {stage}', { stage: t(completion.stage.name) }), 3000);
       }
     }
 
@@ -510,10 +547,10 @@ export class Game {
           if (!result.ok) {
             this.ui.toast(
               result.reason === 'notInStash'
-                ? 'Teil nicht im Lager.'
+                ? t('Teil nicht im Lager.')
                 : result.reason === 'moduleTooLow'
-                  ? 'Werkbank zu niedrig.'
-                  : 'Passt nicht.',
+                  ? t('Werkbank zu niedrig.')
+                  : t('Passt nicht.'),
             );
             return;
           }
@@ -526,14 +563,14 @@ export class Game {
           if (!result.ok) {
             this.ui.toast(
               result.reason === 'notEnoughCredits'
-                ? 'Nicht genug Credits.'
+                ? t('Nicht genug Credits.')
                 : result.reason === 'moduleTooLow'
-                  ? 'Werkbank Stufe 2 nötig.'
-                  : 'Nichts instandzusetzen.',
+                  ? t('Werkbank Stufe 2 nötig.')
+                  : t('Nichts instandzusetzen.'),
             );
             return;
           }
-          this.ui.toast(`Instandgesetzt für ${result.cost} ¢.`);
+          this.ui.toast(tf('Instandgesetzt für {cost} ¢.', { cost: result.cost ?? 0 }));
           void this.saveProfile();
           this.showWorkshopScreen();
         },
@@ -568,7 +605,7 @@ export class Game {
           // Commit the gear before the raid starts: from this moment it has
           // left the stash and is genuinely at risk (Pillar P1).
           if (!commitLoadout(this.profile)) {
-            this.ui.toast('Ausrüstung nicht mehr im Lager verfügbar.');
+            this.ui.toast(t('Ausrüstung nicht mehr im Lager verfügbar.'));
             this.states.transitionTo('loadout');
             return;
           }
@@ -691,17 +728,23 @@ export class Game {
     });
 
     sim.bus.on('extraction:opened', (event) => {
-      this.hud?.showBanner(`${event.name} offen`);
+      this.hud?.showBanner(tf('{zone} offen', { zone: t(event.name) }));
       this.audio.play('extraction.open');
       this.haptics.impact('light');
     });
 
     sim.bus.on('extraction:closing', (event) => {
-      this.hud?.showBanner(`Ausgang schließt in ${Math.round(event.secondsLeft)} s`, 2600);
+      this.hud?.showBanner(
+        tf('Ausgang schließt in {seconds} s', { seconds: Math.round(event.secondsLeft) }),
+        2600,
+      );
     });
 
     sim.bus.on('raid:timeWarning', (event) => {
-      this.hud?.showBanner(`Noch ${Math.round(event.secondsLeft / 60)} Minuten`, 2600);
+      this.hud?.showBanner(
+        tf('Noch {minutes} Minuten', { minutes: Math.round(event.secondsLeft / 60) }),
+        2600,
+      );
     });
 
     sim.bus.on('damage:dealt', (event) => {
@@ -714,13 +757,13 @@ export class Game {
     });
 
     sim.bus.on('loot:rejected', () => {
-      this.ui.toast('Zu schwer. Etwas zurücklassen.');
+      this.ui.toast(t('Zu schwer. Etwas zurücklassen.'));
       this.audio.play('loot.denied');
     });
 
     sim.bus.on('loot:pickedUp', (event) => {
       const def = findItem(event.itemId);
-      if (def) this.ui.toast(`${def.name} ×${event.quantity}`, 1200);
+      if (def) this.ui.toast(`${t(def.name)} ×${event.quantity}`, 1200);
       this.audio.play('loot.pickup');
     });
 
@@ -745,7 +788,7 @@ export class Game {
     sim.bus.on('door:opened', (event) => {
       this.audio.play('door.open', { x: event.x, y: event.y });
       if (event.wasLocked) {
-        this.ui.toast('Schloss entriegelt.', 1400);
+        this.ui.toast(t('Schloss entriegelt.'), 1400);
         this.haptics.impact('medium');
       }
     });
@@ -757,7 +800,10 @@ export class Game {
       if (reportedLocks.has(event.entity)) return;
       reportedLocks.add(event.entity);
       const key = event.keyItemId ? findItem(event.keyItemId)?.name : null;
-      this.ui.toast(key ? `Verschlossen. Benötigt: ${key}` : 'Verschlossen.', 2200);
+      this.ui.toast(
+        key ? tf('Verschlossen. Benötigt: {key}', { key: t(key) }) : t('Verschlossen.'),
+        2200,
+      );
       this.audio.play('door.locked');
     });
   }
@@ -856,17 +902,20 @@ export class Game {
     if (!hint) return;
 
     this.hintUntil = performance.now() + hint.seconds * 1000;
-    this.hud?.showBanner(hint.text, hint.seconds * 1000);
+    this.hud?.showBanner(t(hint.text), hint.seconds * 1000);
   }
 
   /** Surface what the settlement did beyond moving loot. */
   private reportSettlement(report: SettlementReport): void {
     for (const completion of report.questCompletions) {
-      this.ui.toast(`Auftrag abgeschlossen: ${completion.stage.name}`, 3200);
+      this.ui.toast(tf('Auftrag abgeschlossen: {stage}', { stage: t(completion.stage.name) }), 3200);
     }
     if (report.insuranceReturns.length > 0) {
       this.ui.toast(
-        `Versicherung: ${report.insuranceReturns.length} Teile in ${report.insuranceMinutes} min zurück.`,
+        tf('Versicherung: {count} Teile in {minutes} min zurück.', {
+          count: report.insuranceReturns.length,
+          minutes: report.insuranceMinutes,
+        }),
         3200,
       );
     }
@@ -943,6 +992,10 @@ export class Game {
         onToggleHanded: () => {
           this.touch.leftHanded = this.settings.leftHanded;
         },
+        onSelectLocale: (locale) => {
+          this.closeOverlays();
+          void this.applyLocale(locale);
+        },
       }),
     );
   }
@@ -968,7 +1021,7 @@ export class Game {
       const available = countItem(this.profile.stash, itemId) - packed;
       const amount = Math.min(delta, Math.max(0, available));
       if (amount <= 0) {
-        this.ui.toast('Nicht genug im Lager.');
+        this.ui.toast(t('Nicht genug im Lager.'));
         return;
       }
       if (existing) existing.quantity += amount;
@@ -1026,6 +1079,30 @@ export class Game {
       const bag = stash.slots.find((slot) => findItem(slot.itemId)?.category === 'backpack');
       if (bag) loadout.backpackItemId = bag.itemId;
     }
+  }
+
+  /**
+   * The language the player last chose, or the one their device suggests.
+   *
+   * Stored separately from the profile: a language is a property of the person,
+   * not of the character, and resetting a profile must not switch the menus
+   * back to German mid-session.
+   */
+  private async loadLocale(): Promise<Locale> {
+    const stored = await this.storage.get(LOCALE_KEY);
+    if (stored === 'de' || stored === 'en') return stored;
+
+    const preferred = globalThis.navigator?.language ?? '';
+    return preferred.toLowerCase().startsWith('de') ? 'de' : 'en';
+  }
+
+  /** Switch language and redraw whatever is on screen. */
+  private async applyLocale(locale: Locale): Promise<void> {
+    this.settings.locale = locale;
+    setLocale(locale);
+    await this.storage.set(LOCALE_KEY, locale);
+    // Screens are built once and cached, so the current one has to be rebuilt.
+    this.states.reenter();
   }
 
   private async saveProfile(): Promise<void> {
@@ -1089,6 +1166,6 @@ export class Game {
     if (!this.profile.stash.slots.some((slot) => findItem(slot.itemId)?.category === 'backpack')) {
       addItem(this.profile.stash, 'itm_bag_small', 1);
     }
-    this.ui.toast('Notausrüstung aus Basisbestand ausgegeben.', 3600);
+    this.ui.toast(t('Notausrüstung aus Basisbestand ausgegeben.'), 3600);
   }
 }
