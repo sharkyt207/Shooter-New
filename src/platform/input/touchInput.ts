@@ -10,6 +10,14 @@
  * the touch that started the gesture, so a thumb sliding across the midline
  * never switches roles mid-drag.
  *
+ * **Aiming and firing are two stages of the same thumb, not one.** Touching the
+ * right side turns the character and shows the aim line; the weapon only fires
+ * once the stick is pushed past `INPUT.fireAtDeflection`. Before that change
+ * the gun started firing barely outside the deadzone, so there was no way to
+ * look somewhere without shooting at it - and in an extraction shooter, where
+ * a shot is heard across half the map, that is not a rough edge but a wrong
+ * game.
+ *
  * Since M6 the stick radius scales with the screen instead of being a fixed
  * number of pixels. A thumb sweep is a physical distance, not a pixel count:
  * 90 px is comfortable on a phone and a twitch on a tablet.
@@ -20,6 +28,8 @@ import { createInputState, type InputSource, type InputState } from './inputSour
 
 export interface StickVisual {
   active: boolean;
+  /** Aim stick only: true while the deflection is past the firing point. */
+  armed: boolean;
   /** Origin in CSS pixels, relative to the viewport. */
   originX: number;
   originY: number;
@@ -48,11 +58,19 @@ export class TouchInput implements InputSource {
   private moveStick: ActiveStick | null = null;
   private aimStick: ActiveStick | null = null;
   private buttons = { fire: false, reload: false, interact: false, sprint: false };
+  /**
+   * Latched firing state for the aim stick's hysteresis.
+   *
+   * Held here rather than recomputed per frame because hysteresis *is* memory:
+   * whether the current deflection fires depends on whether it was already
+   * firing.
+   */
+  private aimArmed = false;
   private oneShots = { toggleInventory: false, pause: false, melee: false };
 
   private readonly visuals: TouchVisuals = {
-    move: { active: false, originX: 0, originY: 0, knobX: 0, knobY: 0 },
-    aim: { active: false, originX: 0, originY: 0, knobX: 0, knobY: 0 },
+    move: { active: false, originX: 0, originY: 0, knobX: 0, knobY: 0, armed: false },
+    aim: { active: false, originX: 0, originY: 0, knobX: 0, knobY: 0, armed: false },
   };
 
   /** Mirrors the stick halves for left-handed players. */
@@ -129,11 +147,25 @@ export class TouchInput implements InputSource {
     const aim = this.readStick(this.aimStick);
     out.aimX = aim.x;
     out.aimY = aim.y;
+    out.aimActive = this.aimStick !== null;
 
-    // Deflecting the aim stick fires: on touch, a separate fire button costs a
-    // finger the player does not have.
-    const aimStrength = Math.hypot(aim.x, aim.y);
-    out.fire = this.buttons.fire || aimStrength >= INPUT.autoFireThreshold;
+    // Raw deflection, not the ramped value the axes use. The ramp exists to
+    // make slow movement possible; the firing point has to sit at the same
+    // physical place on the screen every time, or the player cannot learn it.
+    const deflection = this.rawDeflection(this.aimStick);
+    if (this.aimArmed) {
+      if (deflection < INPUT.fireReleaseDeflection) this.aimArmed = false;
+    } else if (deflection >= INPUT.fireAtDeflection) {
+      this.aimArmed = true;
+    }
+    if (this.aimStick === null) this.aimArmed = false;
+
+    // The HUD draws the aim stick differently once it is firing, so the player
+    // sees the threshold rather than discovering it by shooting. Set here, next
+    // to the decision it mirrors.
+    this.visuals.aim.armed = this.aimArmed;
+
+    out.fire = this.buttons.fire || this.aimArmed;
 
     out.sprint = this.buttons.sprint;
     out.reload = this.buttons.reload;
@@ -234,9 +266,20 @@ export class TouchInput implements InputSource {
     return scratch;
   }
 
+  /** Aim-stick deflection as a fraction of the stick radius, unramped. */
+  private rawDeflection(stick: ActiveStick | null): number {
+    if (!stick) return 0;
+    const dx = stick.currentX - stick.originX;
+    const dy = stick.currentY - stick.originY;
+    return Math.min(1, Math.hypot(dx, dy) / this.radiusPx);
+  }
+
   private updateVisuals(): void {
     applyVisual(this.visuals.move, this.moveStick, this.radiusPx);
     applyVisual(this.visuals.aim, this.aimStick, this.radiusPx);
+    // `armed` is deliberately not set here. It is computed in `read()`, and
+    // writing it from a pointer handler made the ring lag the trigger by one
+    // event - the stick looked unarmed on the frame it started firing.
   }
 }
 
@@ -246,6 +289,7 @@ const scratch = { x: 0, y: 0 };
 function applyVisual(visual: StickVisual, stick: ActiveStick | null, radiusPx: number): void {
   if (!stick) {
     visual.active = false;
+    visual.armed = false;
     return;
   }
 

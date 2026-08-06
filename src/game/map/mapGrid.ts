@@ -188,6 +188,49 @@ export class MapGrid {
   }
 
   /**
+   * How far a ray travels before a wall stops it, in metres.
+   *
+   * The same DDA walk as `hasLineOfSight`, but reporting the distance instead
+   * of a yes/no. Used by the aim line, which is therefore showing the player
+   * exactly what the simulation would compute - if the line stops short of a
+   * target, so does the bullet.
+   */
+  raycastDistance(x0: number, y0: number, dirX: number, dirY: number, maxDistance: number): number {
+    const length = Math.hypot(dirX, dirY);
+    if (length < 1e-6) return 0;
+    const nx = dirX / length;
+    const ny = dirY / length;
+
+    const cs = this.cellSize;
+    let cx = this.worldToCellX(x0);
+    let cy = this.worldToCellY(y0);
+    if (this.isBlocking(cx, cy)) return 0;
+
+    const stepX = nx > 0 ? 1 : -1;
+    const stepY = ny > 0 ? 1 : -1;
+    let tMaxX = nx !== 0 ? ((nx > 0 ? cx + 1 : cx) * cs - x0) / nx : Infinity;
+    let tMaxY = ny !== 0 ? ((ny > 0 ? cy + 1 : cy) * cs - y0) / ny : Infinity;
+    const tDeltaX = nx !== 0 ? cs / Math.abs(nx) : Infinity;
+    const tDeltaY = ny !== 0 ? cs / Math.abs(ny) : Infinity;
+
+    const maxSteps = this.width + this.height + 2;
+    for (let step = 0; step < maxSteps; step++) {
+      const t = Math.min(tMaxX, tMaxY);
+      if (t >= maxDistance) return maxDistance;
+
+      if (tMaxX < tMaxY) {
+        cx += stepX;
+        tMaxX += tDeltaX;
+      } else {
+        cy += stepY;
+        tMaxY += tDeltaY;
+      }
+      if (this.isBlocking(cx, cy)) return t;
+    }
+    return maxDistance;
+  }
+
+  /**
    * Line of sight between two world points, using a DDA grid walk.
    * Returns true when no wall cell blocks the segment.
    */

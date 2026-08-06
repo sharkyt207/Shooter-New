@@ -71,6 +71,16 @@ export interface PlayerTag {
    * player - which is the entire decision the night side of a fragment poses.
    */
   lightOn: boolean;
+  /**
+   * True while the player is holding an aim direction.
+   *
+   * Simulation state, not presentation: the renderer reads it to draw the aim
+   * line, and it exists here rather than in the renderer because the renderer
+   * has no access to intent (ADR-002).
+   */
+  aiming: boolean;
+  /** True on the ticks the weapon is actually firing. Drives the aim line's colour. */
+  firing: boolean;
 }
 
 export interface Stamina {

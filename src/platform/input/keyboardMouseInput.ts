@@ -73,9 +73,13 @@ export class KeyboardMouseInput implements InputSource {
     if (length > 4) {
       out.aimX = dx / length;
       out.aimY = dy / length;
+      // A mouse always aims - the split between aiming and firing that the
+      // touch sticks need is already there on a desktop, as the mouse button.
+      out.aimActive = true;
     } else {
       out.aimX = 0;
       out.aimY = 0;
+      out.aimActive = false;
     }
 
     out.fire = this.mouseDown || this.held('Space');

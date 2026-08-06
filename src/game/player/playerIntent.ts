@@ -10,9 +10,17 @@ export interface PlayerIntent {
   /** Movement axis, each component in -1..1. */
   moveX: number;
   moveY: number;
-  /** Aim direction. A zero vector means "keep facing the movement direction". */
+  /**
+   * Aim direction. A zero vector means "no direction given this tick".
+   *
+   * Read together with `aimActive`: a thumb resting inside the deadzone gives
+   * a zero vector while still aiming, and must hold the facing rather than let
+   * it snap back to the movement direction.
+   */
   aimX: number;
   aimY: number;
+  /** True while the player is deliberately aiming. */
+  aimActive: boolean;
 
   fire: boolean;
   sprint: boolean;
@@ -40,6 +48,7 @@ export function createIntent(): PlayerIntent {
     moveY: 0,
     aimX: 0,
     aimY: 0,
+    aimActive: false,
     fire: false,
     sprint: false,
     reload: false,
@@ -59,6 +68,7 @@ export function copyIntent(target: PlayerIntent, source: Readonly<PlayerIntent>)
   target.moveY = source.moveY;
   target.aimX = source.aimX;
   target.aimY = source.aimY;
+  target.aimActive = source.aimActive;
   target.fire = source.fire;
   target.sprint = source.sprint;
   target.reload = source.reload;

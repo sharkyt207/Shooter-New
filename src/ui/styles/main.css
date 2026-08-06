@@ -636,6 +636,37 @@ body {
   border-color: rgba(255, 177, 61, 0.5);
 }
 
+/*
+ * The firing threshold, drawn as a ring inside the aim stick.
+ *
+ * A two-stage aim stick is only learnable if the player can see where the
+ * second stage begins. `--fire-at` is set from the same balance constant the
+ * input layer arms on, so the ring and the trigger cannot disagree.
+ */
+.stick--aim::after {
+  content: '';
+  position: absolute;
+  inset: calc(50% - var(--stick-radius, 90px) * var(--fire-at, 0.62));
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 177, 61, 0.34);
+}
+
+/* Past the threshold the whole stick commits to the firing colour. Hue *and*
+   weight change: colour alone is not enough on a phone in sunlight. */
+.stick--aim.is-armed {
+  border-color: rgba(255, 77, 94, 0.45);
+}
+
+.stick--aim.is-armed::after {
+  border-style: solid;
+  border-color: rgba(255, 77, 94, 0.75);
+}
+
+.stick--aim.is-armed .stick__knob {
+  background: rgba(255, 77, 94, 0.32);
+  border-color: rgba(255, 77, 94, 0.8);
+}
+
 /* ── Damage vignette ────────────────────────────────────────────────────── */
 
 .hud__vignette {

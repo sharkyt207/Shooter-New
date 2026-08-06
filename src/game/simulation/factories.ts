@@ -50,6 +50,8 @@ export function createPlayer(
     raidXp: 0,
     kills: 0,
     lightOn: ambientLight < LIGHT.darkThreshold,
+    aiming: false,
+    firing: false,
   });
   world.renderables.set(entity, { assetKey: 'actor.player', height: 1.8, tint: 0xffffff });
 

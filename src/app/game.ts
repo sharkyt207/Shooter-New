@@ -292,6 +292,7 @@ export class Game {
       this.intent.moveY = state.moveY;
       this.intent.aimX = state.aimX;
       this.intent.aimY = state.aimY;
+      this.intent.aimActive = state.aimActive;
       this.intent.fire = state.fire;
       this.intent.sprint = state.sprint;
       this.intent.reload = state.reload;

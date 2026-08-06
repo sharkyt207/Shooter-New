@@ -18,9 +18,19 @@ export interface MoveResult {
   y: number;
   /** True when the mover was pushed out of at least one wall. */
   hitWall: boolean;
+  /**
+   * Which axis was blocked.
+   *
+   * Reported separately because the caller must not bleed off the velocity of
+   * an axis that was free. Running *along* a wall blocks X and leaves Y open;
+   * damping both turns a clean slide into wading through mud, and that was the
+   * single worst thing about how movement felt.
+   */
+  hitX: boolean;
+  hitY: boolean;
 }
 
-const result: MoveResult = { x: 0, y: 0, hitWall: false };
+const result: MoveResult = { x: 0, y: 0, hitWall: false, hitX: false, hitY: false };
 
 /**
  * Move a circle by (dx, dy) and push it out of any wall it ends up inside.
@@ -39,13 +49,14 @@ export function moveCircle(
 ): MoveResult {
   let px = x;
   let py = y;
-  let hitWall = false;
+  let hitX = false;
+  let hitY = false;
 
   if (dx !== 0) {
     px += dx;
     if (resolveAgainstWalls(grid, px, py, radius, true)) {
       px = resolvedX;
-      hitWall = true;
+      hitX = true;
     }
   }
 
@@ -53,13 +64,15 @@ export function moveCircle(
     py += dy;
     if (resolveAgainstWalls(grid, px, py, radius, false)) {
       py = resolvedY;
-      hitWall = true;
+      hitY = true;
     }
   }
 
   result.x = px;
   result.y = py;
-  result.hitWall = hitWall;
+  result.hitX = hitX;
+  result.hitY = hitY;
+  result.hitWall = hitX || hitY;
   return result;
 }
 

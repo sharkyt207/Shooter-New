@@ -69,12 +69,12 @@ export function playerSystem(ctx: SimContext): void {
   );
   transform.x = moved.x;
   transform.y = moved.y;
-  if (moved.hitWall) {
-    // Bleed off velocity into the wall so the player does not "stick" while
-    // holding a direction against it.
-    velocity.x *= 0.4;
-    velocity.y *= 0.4;
-  }
+  // Bleed off velocity only into the axis that was actually blocked. Damping
+  // both turns running along a wall - the most common thing a player does in a
+  // corridor - into wading through mud, because the free axis loses 60 % of its
+  // speed every tick for as long as the shoulder touches the wall.
+  if (moved.hitX) velocity.x *= 0.4;
+  if (moved.hitY) velocity.y *= 0.4;
 
   // ── Stamina ──────────────────────────────────────────────────────────────
   updateStamina(ctx, stamina, wantsSprint, load, dt);
@@ -91,15 +91,30 @@ export function playerSystem(ctx: SimContext): void {
   }
 
   // ── Aiming ───────────────────────────────────────────────────────────────
+  //
+  // Three cases, in order of authority:
+  //   1. A deliberate aim direction wins outright.
+  //   2. Aiming with the stick centred *holds* the current facing. Snapping
+  //      back to the movement direction the moment the thumb settles is what
+  //      makes a twin-stick feel like it is fighting the player.
+  //   3. Otherwise the character looks where it is going.
   let aimAngle = transform.rotation;
   const aimLen = Math.hypot(intent.aimX, intent.aimY);
   if (aimLen > 0.001) {
     aimAngle = Math.atan2(intent.aimY, intent.aimX);
     aimAngle = applyAimAssist(ctx, transform.x, transform.y, aimAngle);
-  } else if (speed > 0.3) {
+  } else if (!intent.aimActive && speed > 0.3) {
     aimAngle = Math.atan2(velocity.y, velocity.x);
   }
   transform.rotation = approachAngle(transform.rotation, aimAngle, TURN_RATE_DEG * DEG_TO_RAD * dt);
+
+  // The renderer draws the aim line from this; the simulation itself never
+  // decides how it looks (ADR-002).
+  const playerTag = world.players.get(entity);
+  if (playerTag) {
+    playerTag.aiming = intent.aimActive;
+    playerTag.firing = intent.fire && !busy;
+  }
 
   // ── Item use ─────────────────────────────────────────────────────────────
   handleItemUse(ctx);

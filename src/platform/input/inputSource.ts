@@ -14,6 +14,16 @@ export interface InputState {
   /** Aim direction. Zero length means "no explicit aim". */
   aimX: number;
   aimY: number;
+  /**
+   * True while the player is actively aiming - holding the aim stick, or
+   * moving a mouse.
+   *
+   * Separate from the aim vector because they answer different questions.
+   * A thumb resting inside the deadzone produces a zero vector but must still
+   * hold the character's facing: snapping back to the movement direction the
+   * instant the stick is centred is what makes a twin-stick feel loose.
+   */
+  aimActive: boolean;
   /** True while the player wants to shoot. */
   fire: boolean;
   sprint: boolean;
@@ -32,6 +42,7 @@ export function createInputState(): InputState {
     moveY: 0,
     aimX: 0,
     aimY: 0,
+    aimActive: false,
     fire: false,
     sprint: false,
     reload: false,
@@ -75,6 +86,7 @@ export class CompositeInput implements InputSource {
     out.moveY = 0;
     out.aimX = 0;
     out.aimY = 0;
+    out.aimActive = false;
     out.fire = false;
     out.sprint = false;
     out.reload = false;
@@ -95,6 +107,7 @@ export class CompositeInput implements InputSource {
         out.aimX = s.aimX;
         out.aimY = s.aimY;
       }
+      out.aimActive ||= s.aimActive;
       out.fire ||= s.fire;
       out.sprint ||= s.sprint;
       out.reload ||= s.reload;

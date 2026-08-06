@@ -417,8 +417,22 @@ export const INPUT = {
   deadzone: 0.12,
   /** Deflection at which movement reaches full speed. */
   fullThrottleAt: 0.7,
-  /** Right-stick deflection above which the weapon fires automatically. */
-  autoFireThreshold: 0.25,
+  /**
+   * Where firing begins on the aim stick, as **raw** deflection 0..1.
+   *
+   * Two values, not one. A single threshold makes the weapon stutter on and
+   * off while the thumb rests near it, which reads as a broken gun rather than
+   * as a boundary. Arming high and disarming lower gives the stick a definite
+   * click-point in both directions.
+   *
+   * Raw deflection rather than the ramped movement curve: the player's thumb
+   * moves in a straight line, and the point where shooting starts has to be in
+   * the same place every time. 0.62 is roughly two thirds of the way out - far
+   * enough that resting the thumb aims, near enough that firing is not a
+   * stretch.
+   */
+  fireAtDeflection: 0.62,
+  fireReleaseDeflection: 0.46,
 
   /**
    * Virtual stick radius, as a fraction of the *short* screen edge.

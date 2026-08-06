@@ -9,6 +9,7 @@
  * The last point is what keeps the DOM overlay inside its 1.5 ms frame budget.
  */
 
+import { INPUT } from '@/content/balance';
 import { formatClock } from '@/core/time/fixedClock';
 import type { HudViewModel } from '@/ui/viewModel';
 import type { TouchInput } from '@/platform/input/touchInput';
@@ -435,6 +436,9 @@ export class Hud {
     if (radius !== this.last.stickRadius) {
       this.last.stickRadius = radius;
       this.root.style.setProperty('--stick-radius', `${radius}px`);
+      // The drawn threshold ring comes from the same constant the input layer
+      // arms on, so what the player sees is what the trigger does.
+      this.root.style.setProperty('--fire-at', String(INPUT.fireAtDeflection));
     }
 
     const visuals = this.touch.getVisuals();
@@ -477,9 +481,17 @@ export interface MinimapGrid {
 function applyStick(
   stick: HTMLElement,
   knob: HTMLElement,
-  visual: { active: boolean; originX: number; originY: number; knobX: number; knobY: number },
+  visual: {
+    active: boolean;
+    armed: boolean;
+    originX: number;
+    originY: number;
+    knobX: number;
+    knobY: number;
+  },
 ): void {
   stick.classList.toggle('is-active', visual.active);
+  stick.classList.toggle('is-armed', visual.armed);
   if (!visual.active) return;
   stick.style.left = `${visual.originX}px`;
   stick.style.top = `${visual.originY}px`;

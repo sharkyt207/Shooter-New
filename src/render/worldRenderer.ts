@@ -75,6 +75,14 @@ interface WeatherParticle {
   vy: number;
 }
 
+/**
+ * How far the aim line reaches, in metres.
+ *
+ * Deliberately shorter than any weapon's range: the line is a pointing aid,
+ * not a laser sight that reveals the whole map through a doorway.
+ */
+const AIM_LINE_RANGE = 14;
+
 export class WorldRenderer {
   readonly stage = new Container();
   readonly camera: Camera;
@@ -84,6 +92,11 @@ export class WorldRenderer {
   private readonly groundLayer = new Container();
   private readonly entityLayer = new Container();
   private readonly vfxLayer = new Container();
+  /**
+   * The aim line, drawn under the entities so it reads as coming *from* the
+   * character rather than lying on top of it.
+   */
+  private readonly aimLayer = new Graphics();
   private readonly darknessLayer = new Container();
   private readonly lightLayer = new Container();
   private readonly weatherLayer = new Container();
@@ -131,7 +144,13 @@ export class WorldRenderer {
     this.camera = new Camera(new SeededRandom(0xc0ffee));
 
     this.entityLayer.sortableChildren = true;
-    this.world.addChild(this.floorLayer, this.groundLayer, this.entityLayer, this.vfxLayer);
+    this.world.addChild(
+      this.floorLayer,
+      this.groundLayer,
+      this.aimLayer,
+      this.entityLayer,
+      this.vfxLayer,
+    );
     this.stage.addChild(
       this.world,
       this.darknessLayer,
@@ -225,6 +244,7 @@ export class WorldRenderer {
 
     this.updateCamera(sim, alpha, aimX, aimY, dt);
     this.updateWalls(sim);
+    this.updateAimLine(sim, alpha);
     this.updateEntities(sim, alpha);
     this.updateZones(sim);
     this.updateAnomalyFields(sim);
@@ -233,6 +253,58 @@ export class WorldRenderer {
     this.updateVfx(dt);
     this.updateDamageNumbers(dt);
     if (this.debugEnabled) this.drawDebug(sim);
+  }
+
+  /**
+   * The aim line: where the shot goes, and whether the trigger is live.
+   *
+   * This is the feedback the two-stage aim stick needs. Without it "aiming"
+   * and "about to fire" look identical, and the player learns the threshold by
+   * accidentally shooting - which in a game where noise carries is an expensive
+   * lesson.
+   *
+   * It stops at the first wall, so it doubles as a line-of-sight readout: if
+   * the line does not reach the target, neither will the bullet.
+   */
+  private updateAimLine(sim: RaidSimulation, alpha: number): void {
+    const line = this.aimLayer;
+    line.clear();
+
+    const entity = sim.world.playerEntity;
+    if (entity === null) return;
+    const tag = sim.world.players.get(entity);
+    const transform = sim.world.transforms.get(entity);
+    if (!tag?.aiming || !transform) return;
+
+    const x = lerp(transform.prevX, transform.x, alpha);
+    const y = lerp(transform.prevY, transform.y, alpha);
+    const dirX = Math.cos(transform.rotation);
+    const dirY = Math.sin(transform.rotation);
+
+    const range = sim.grid.raycastDistance(x, y, dirX, dirY, AIM_LINE_RANGE);
+    const from = worldToScreen(x, y, projScratch);
+    const fromX = from.x;
+    const fromY = from.y;
+    const to = worldToScreen(x + dirX * range, y + dirY * range, projScratch);
+
+    // Armed reads as the weapon's own colour and a solid line; merely aiming is
+    // a thin, dim guide. The difference has to be obvious at arm's length on a
+    // phone, so it is both hue *and* weight - colour alone fails in sunlight.
+    const armed = tag.firing;
+    line.moveTo(fromX, fromY);
+    line.lineTo(to.x, to.y);
+    // Tuned against a screenshot on a phone viewport, not guessed: at alpha
+    // 0.22 the aiming line was invisible, which defeats the point of having a
+    // stage that only aims.
+    line.stroke({
+      width: armed ? 2.5 : 1.5,
+      color: armed ? 0xff6a4d : 0x9fd0e0,
+      alpha: armed ? 0.7 : 0.42,
+    });
+
+    // A small mark where the line ends, so the player can judge distance.
+    line.circle(to.x, to.y, armed ? 5 : 3.5);
+    line.stroke({ width: 1.5, color: armed ? 0xff6a4d : 0x9fd0e0, alpha: armed ? 0.9 : 0.55 });
   }
 
   private updateCamera(

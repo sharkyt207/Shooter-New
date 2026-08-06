@@ -457,3 +457,46 @@ lokal tadellos funktioniert und nur dort bricht. Die Grenzen der Web-Fassung
 bleiben dokumentiert und sind genau die Begründung für die native: keine
 Vibration auf iOS, kein erzwungenes Querformat auf iOS, und ein Spielstand, den
 iOS bei Speicherdruck löschen darf.
+
+---
+
+## ADR-020 — Zielen und Schießen sind zwei Stufen desselben Daumens
+
+**Status:** akzeptiert (M9)
+
+**Kontext.** Der rechte Stick feuerte, sobald er den Totbereich verließ: Der
+Schwellwert lag bei 0,25 der *gerampten* Auslenkung, also bei rund 26 % des
+Stickradius — etwa 20 Pixel. Wer hinsah, schoss. In einem Extraction-Shooter,
+in dem ein Schuss über den halben Fragment gehört wird und Gegner darauf
+zulaufen, ist das kein rauer Rand, sondern ein anderes Spiel.
+
+**Entscheidung.** Der Zielstick hat zwei Stufen:
+
+1. **Berühren und halten** dreht die Spielfigur und zeigt eine Ziellinie.
+2. **Über `INPUT.fireAtDeflection` (0,62) hinausdrücken** feuert.
+
+Gemessen wird die **rohe** Auslenkung, nicht die gerampte. Entschärft wird erst
+bei 0,46 — zwei Werte, nicht einer.
+
+**Begründung.**
+
+1. **Hinsehen ohne zu schießen ist eine Grundhandlung.** Ohne sie gibt es keine
+   Aufklärung, kein Warten an einer Ecke, kein Zielen auf eine Tür, hinter der
+   vielleicht nichts ist.
+2. **Rohe Auslenkung, weil der Daumen gerade fährt.** Die Rampe existiert, damit
+   langsames Gehen möglich ist. Der Feuerpunkt muss dagegen bei jedem Gerät an
+   derselben *physischen* Stelle des Sticks liegen, sonst ist er nicht erlernbar.
+   Ein Test prüft das über drei Stickradien.
+3. **Hysterese, weil ein einzelner Schwellwert flackert.** Ein Daumen, der nahe
+   der Grenze ruht, würde die Waffe an- und ausschalten; das liest sich als
+   defektes Gewehr, nicht als Grenze.
+4. **Sichtbar statt erratbar.** Der Ring im Stick kommt aus derselben Konstante
+   wie der Auslöser, die Ziellinie wechselt Farbe *und* Stärke — Farbe allein
+   trägt auf einem Telefon in der Sonne nicht.
+
+**Konsequenzen.** `InputState` und `PlayerIntent` führen `aimActive` getrennt
+vom Zielvektor: Ein Daumen im Totbereich liefert einen Nullvektor, *hält* aber
+die Blickrichtung. Ohne diese Trennung schnappt die Figur beim Loslassen zurück
+in die Laufrichtung, und genau das lässt einen Twin-Stick lose wirken. Die
+Ziellinie liest `MapGrid.raycastDistance` — sie zeigt damit, was die Simulation
+ohnehin rechnet, statt eine eigene Wahrheit zu erfinden.
