@@ -1,0 +1,3 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web-C-poxNO9.js","./dist-Bv5dNuds.js"])))=>i.map(i=>d[i]);
+import{s as e}from"./pixi-C2igxpEo.js";import{n as t}from"./dist-Bv5dNuds.js";var n=t(`ScreenOrientation`,{web:()=>e(()=>import(`./web-C-poxNO9.js`).then(e=>new e.ScreenOrientationWeb),__vite__mapDeps([0,1]),import.meta.url)});export{n as ScreenOrientation};
+//# sourceMappingURL=esm-DxYdHRr_.js.map
