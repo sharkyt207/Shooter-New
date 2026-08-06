@@ -20,7 +20,8 @@ export interface MainMenuCallbacks {
 
 export function createMainMenuScreen(
   profile: PlayerProfile,
-  version: string,
+  /** Version and milestone, composed by `app/` - the layer that knows both. */
+  build: string,
   callbacks: MainMenuCallbacks,
 ): Screen {
   const stats = profile.stats;
@@ -91,7 +92,7 @@ export function createMainMenuScreen(
           })
         : null,
 
-      el('div', { className: 'muted', text: tf('Version {version} · Meilenstein {milestone}', { version, milestone: 'M7' }) }),
+      el('div', { className: 'muted', text: tf('Version {version}', { version: build }) }),
     ],
   });
 

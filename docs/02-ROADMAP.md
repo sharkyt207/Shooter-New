@@ -348,6 +348,25 @@ Diagnose-Bildschirm wies danach `2026.2-probe` als aktive Balance-Version aus.
 
 **Doku:** `docs/modules/telemetry.md`, `docs/11-COMPLIANCE.md`
 
+**Spielbar auf dem Telefon, ohne Mac**
+
+Derselbe `dist/`-Ordner wird als installierbare Web-App ausgeliefert: eigenes
+Symbol auf dem Startbildschirm, eigenes Fenster ohne Browser-Leiste, Start ohne
+Netz (ADR-019). Veröffentlichung automatisch über GitHub Pages, mit dem
+vollständigen Qualitäts-Gate davor. Anleitung:
+`docs/12-AUF-DEM-HANDY-TESTEN.md`.
+
+`npm run smoke:pwa` prüft das im Telefonformat **unter einem Unterpfad**, wie
+Pages ausliefert. Der erste Lauf fand einen schwarzen Bildschirm offline: Der
+Service Worker hatte die HTML-Datei im Cache, aber nicht die Bundles — als er
+aktiv wurde, hatte die Seite sie längst geladen, sein `fetch`-Zweig sah sie also
+nie. Er liest sie jetzt beim Installieren aus `index.html`.
+
+Nebenbei behoben: Das Hauptmenü behauptete „Meilenstein M7". Dieselbe Zeile log
+in M6 schon einmal („Prototyp M1"). Version und Meilenstein stehen jetzt an
+einer Stelle in `app/game.ts` und erscheinen auch auf dem Diagnose-Bildschirm,
+damit ein Fehlerbericht seinen Build benennen kann.
+
 **Offen in M8**
 
 - Ein Konfigurationsserver (eine statische Datei hinter einem CDN genügt)

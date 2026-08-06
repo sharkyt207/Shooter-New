@@ -34,7 +34,7 @@ export const EN: Catalogue = {
   Extraktionen: 'Extractions',
   Verluste: 'Losses',
   'Bester Fund': 'Best haul',
-  'Version {version} · Meilenstein {milestone}': 'Version {version} · Milestone {milestone}',
+  'Version {version}': 'Version {version}',
 
   // ── Base ─────────────────────────────────────────────────────────────────
   Basis: 'Base',
@@ -497,6 +497,7 @@ export const EN: Catalogue = {
     'These figures stay on this device. Nothing is sent, shared or analysed — they exist only here.',
   'Noch keine Raids aufgezeichnet.': 'No raids recorded yet.',
   Konfiguration: 'Configuration',
+  Build: 'Build',
   'Balance-Version': 'Balance version',
   'Aufgezeichnete Raids': 'Raids recorded',
   'Raids insgesamt': 'Raids in total',

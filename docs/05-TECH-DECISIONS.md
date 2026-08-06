@@ -417,3 +417,43 @@ wäre nachweislich korrekt. Ein Test durchsucht den Quelltext nach diesem Muster
 Die aktive `balanceVersion()` wird auf jeden Telemetrie-Datensatz gestempelt,
 damit eine Verschiebung in der Extraktionsquote zugeordnet und nicht vermutet
 wird.
+
+---
+
+## ADR-019 — Die Web-App ist der erste Testweg auf ein Telefon
+
+**Status:** akzeptiert (M8)
+
+**Kontext.** Der native Weg über Capacitor braucht einen Mac, Xcode, CocoaPods
+und ein Entwicklerkonto (ADR-015, `docs/modules/platform-mobile.md`). Bis dahin
+gäbe es keine Möglichkeit, das Spiel auf einem echten Telefon zu bedienen — und
+damit keine Möglichkeit, die eine Frage zu beantworten, die kein Test in dieser
+Umgebung beantworten kann: Wie fühlt sich der Twin-Stick unter einem Daumen an?
+
+**Entscheidung.** Derselbe `dist/`-Ordner wird zusätzlich als **installierbare
+Web-App** ausgeliefert: App-Manifest, Symbole, Service Worker, automatische
+Veröffentlichung über GitHub Pages. Der Service Worker ist **handgeschrieben**,
+rund achtzig Zeilen, ohne Plugin.
+
+**Begründung.**
+
+1. **Es ist derselbe Build.** Kein zweiter Codepfad, keine Web-Sonderfassung —
+   die native Hülle würde exakt diese Dateien umschließen. Was auf dem Telefon
+   im Browser falsch aussieht, sieht in der App genauso falsch aus.
+2. **Ein Plugin wäre eine Abhängigkeit für achtzig Zeilen.** ADR-012 verlangt
+   eine Begründung statt einer Annahme. Ein erzeugter Worker müsste ebenso
+   verstanden werden, und er ist das einzige Stück Code zwischen dem Spieler und
+   einem schwarzen Bildschirm.
+3. **Cache-Politik ist eine Entscheidung, keine Vorgabe.** Gehashte Dateien sind
+   inhaltsadressiert und dürfen für immer aus dem Cache kommen; `index.html`
+   darf das nicht, weil ein Testbuild, der eine alte Fassung ausliefert,
+   schlimmer ist als gar kein Cache. Diese Unterscheidung ist der ganze Worker.
+
+**Konsequenzen.** Der Build darf **keinen absoluten Pfad** enthalten: GitHub
+Pages liefert unter `/Shooter-New/` aus, Capacitor aus einem Dateikontext.
+`vite.config.ts` steht deshalb auf `base: './'`, und `scripts/smoke-pwa.mjs`
+liefert `dist/` bewusst unter einem Unterpfad aus, weil ein absoluter Pfad
+lokal tadellos funktioniert und nur dort bricht. Die Grenzen der Web-Fassung
+bleiben dokumentiert und sind genau die Begründung für die native: keine
+Vibration auf iOS, kein erzwungenes Querformat auf iOS, und ein Spielstand, den
+iOS bei Speicherdruck löschen darf.

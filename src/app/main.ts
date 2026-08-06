@@ -9,6 +9,7 @@
 
 import '@/ui/styles/main.css';
 import { LogLevel, setLogLevel } from '@/core/util/logger';
+import { registerServiceWorker } from '@/platform/pwa/serviceWorker';
 import { Game } from './game';
 
 setLogLevel(import.meta.env.DEV ? LogLevel.Debug : LogLevel.Warn);
@@ -23,6 +24,10 @@ async function bootstrap(): Promise<void> {
 
   const game = new Game({ canvasContainer, uiContainer });
   await game.start();
+
+  // After the game is up, never before: an offline cache is a convenience, and
+  // a convenience must not be able to delay or break the first frame.
+  void registerServiceWorker();
 }
 
 bootstrap().catch((error: unknown) => {

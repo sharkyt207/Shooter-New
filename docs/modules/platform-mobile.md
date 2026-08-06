@@ -137,8 +137,50 @@ nicht ein paar Prozent Drift.
 Alle Zahlen stammen von Desktop und Software-Rendering. **Die einzigen Zahlen,
 die zählen, kommen von einem Gerät**, und die stehen noch aus.
 
+## Der Weg auf ein Telefon, der keinen Mac braucht
+
+Der native Weg oben steht weiterhin aus. Der **Web-Build ist deshalb kein
+Notbehelf, sondern der reale Testweg**: dasselbe `dist/`, das die native Hülle
+umschließen würde (ADR-015), nur als installierbare Web-App ausgeliefert.
+
+| Teil | Datei |
+|------|-------|
+| App-Manifest (Name, Symbole, Querformat, eigenes Fenster) | `public/manifest.webmanifest` |
+| Symbole 180/192/512 aus `resources/icon.png` | `public/icons/` |
+| Service Worker | `public/sw.js` |
+| Registrierung als Adapter | `src/platform/pwa/serviceWorker.ts` |
+| Auslieferung | `.github/workflows/deploy-pages.yml` |
+| Anleitung | `docs/12-AUF-DEM-HANDY-TESTEN.md` |
+
+Damit hat das Spiel auf dem Startbildschirm ein eigenes Symbol, ein eigenes
+Fenster ohne Browser-Leiste und startet ohne Netz. Was fehlt, fehlt ehrlich:
+Vibration auf iOS, erzwungenes Querformat auf iOS, und ein Spielstand, den iOS
+bei Speicherdruck löschen darf — genau die drei Gründe, aus denen es die native
+Fassung überhaupt gibt.
+
+### Der Service Worker ist handgeschrieben
+
+Achtzig Zeilen, keine Abhängigkeit (ADR-012, ADR-019). Zwei Regeln:
+
+- **Gehashte Dateien**: Cache zuerst. Ein Name wie `index-D3lQeKET.js` ist
+  inhaltsadressiert — derselbe Name bedeutet denselben Inhalt, für immer.
+- **Alles andere** (`index.html`, das Asset-Manifest): Netz zuerst. Ein
+  Testbuild, der eine alte Fassung ausliefert, ist schlimmer als gar kein Cache,
+  weil der Fehlerbericht dann Code betrifft, den niemand angefasst hat.
+
+Die gehashten Bundles stehen **nicht** in einer Liste im Worker — ihre Namen
+ändern sich mit jedem Build. Er liest sie beim Installieren aus `index.html`.
+Warum nicht einfach beim ersten Gebrauch cachen: Wenn der Worker aktiv wird, hat
+die Seite sie längst geladen, sein `fetch`-Zweig sieht sie also nie, und der
+erste Start ohne Netz zeigt einen schwarzen Bildschirm. Genau das stand da.
+
 ## Tests
 
+- `scripts/smoke-pwa.mjs` (`npm run smoke:pwa`) — liefert `dist/` **unter einem
+  Unterpfad** aus, wie GitHub Pages unter `/Shooter-New/`, und prüft im
+  Telefonformat: Manifest und Symbole, aktiver Service Worker, **Start ohne
+  Netz**. Der Unterpfad ist kein Zierrat — ein einziger absoluter Pfad im Build
+  funktioniert lokal tadellos und bricht dort.
 - `src/platform/native/nativeBridge.test.ts` — Plattformerkennung ohne Runtime,
   mit injiziertem Runtime, bei unbekannter Plattform und bei einem Runtime, der
   wirft; Speicherwahl; Web-Haptik inklusive Aus-Schalter und fehlender
@@ -151,6 +193,8 @@ die zählen, kommen von einem Gerät**, und die stehen noch aus.
 ## Offen / nächster Schritt
 
 - Alles, was einen Mac braucht (siehe oben)
+- Test auf einem echten Telefon über die Web-App — der erste Schritt, der ohne
+  weitere Werkzeuge möglich ist
 - Gerätemessung: Draw Calls, Frame-Zeit und Peak-RAM auf einem iPhone 11
 - Safe-Area auf einem Gerät mit Notch verifizieren
 - Android-Projekt (`npx cap add android`) — die Konfiguration steht bereits

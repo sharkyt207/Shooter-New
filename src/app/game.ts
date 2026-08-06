@@ -127,7 +127,17 @@ const LOCALE_KEY = 'locale';
 const TELEMETRY_KEY = 'telemetry';
 
 const log = createLogger('game');
+
+/**
+ * Build identity, in one place.
+ *
+ * The milestone used to be a literal inside the main menu, which is how it came
+ * to read "Prototyp M1" three milestones later (fixed in M6) and "M7" one
+ * milestone after that. It is shown on the menu *and* on the Diagnose screen,
+ * so a bug report says which build it came from.
+ */
 const VERSION = '0.1.0';
+const MILESTONE = 'M8';
 
 export interface GameOptions {
   canvasContainer: HTMLElement;
@@ -252,7 +262,7 @@ export class Game {
 
     this.states.transitionTo('menu');
     this.audio.setAmbience('menu');
-    log.info(`PROJECT ECHO ${VERSION} gestartet.`);
+    log.info(`PROJECT ECHO ${VERSION} (${MILESTONE}) gestartet.`);
   }
 
   // ── Frame loop ───────────────────────────────────────────────────────────
@@ -312,7 +322,7 @@ export class Game {
     this.states.register('menu', {
       enter: () => {
         this.ui.setScreen(
-          createMainMenuScreen(this.profile, VERSION, {
+          createMainMenuScreen(this.profile, `${VERSION} · ${MILESTONE}`, {
             onContinue: () => this.states.transitionTo('base'),
             onNewProfile: () => {
               this.profile = createDefaultProfile();
@@ -328,7 +338,7 @@ export class Game {
     this.states.register('diagnostics', {
       enter: () => {
         this.ui.setScreen(
-          createDiagnosticsScreen(summarise(this.telemetry), balanceVersion(), {
+          createDiagnosticsScreen(summarise(this.telemetry), balanceVersion(), `${VERSION} · ${MILESTONE}`, {
             onBack: () => this.states.transitionTo('menu'),
             onClear: () => {
               this.telemetry = emptyTelemetry();

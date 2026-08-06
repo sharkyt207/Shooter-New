@@ -25,6 +25,8 @@ export interface DiagnosticsCallbacks {
 export function createDiagnosticsScreen(
   summary: TelemetrySummary,
   balanceVersion: string,
+  /** Version and milestone, so a bug report can name the build it came from. */
+  build: string,
   callbacks: DiagnosticsCallbacks,
 ): Screen {
   const root = el('div', {
@@ -64,6 +66,7 @@ export function createDiagnosticsScreen(
         className: 'panel',
         children: [
           el('div', { className: 'panel__title', text: t('Konfiguration') }),
+          statRow(t('Build'), build),
           statRow(t('Balance-Version'), balanceVersion),
           statRow(t('Aufgezeichnete Raids'), formatNumber(summary.raids)),
           statRow(t('Raids insgesamt'), formatNumber(summary.totalRaids)),

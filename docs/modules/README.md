@@ -18,7 +18,7 @@ implementiert, getestet, optimiert **und** hier dokumentiert ist
 | [economy.md](economy.md) | `game/economy`, `content/traders`, `content/contracts` | 🟢 M5 fertig |
 | [crafting.md](crafting.md) | `game/crafting` | 🟢 M5 fertig |
 | [presentation.md](presentation.md) | `render/`, `ui/`, `app/` | 🟢 Prototyp fertig |
-| [platform-mobile.md](platform-mobile.md) | `platform/native`, `platform/input`, `platform/storage` | 🟡 M6 — Web fertig, native Builds brauchen einen Mac |
+| [platform-mobile.md](platform-mobile.md) | `platform/native`, `platform/input`, `platform/storage`, `platform/pwa` | 🟡 Web-App auf dem Telefon spielbar, native Builds brauchen einen Mac |
 | [audio.md](audio.md) | `platform/audio` | 🟢 M7 fertig |
 | [onboarding.md](onboarding.md) | `content/hints`, `game/base/onboarding` | 🟢 M7 fertig |
 | [i18n.md](i18n.md) | `core/i18n`, `content/locales` | 🟢 M7 fertig |
