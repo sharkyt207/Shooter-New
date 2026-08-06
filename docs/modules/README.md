@@ -19,6 +19,8 @@ implementiert, getestet, optimiert **und** hier dokumentiert ist
 | [crafting.md](crafting.md) | `game/crafting` | 🟢 M5 fertig |
 | [presentation.md](presentation.md) | `render/`, `ui/`, `app/` | 🟢 Prototyp fertig |
 | [platform-mobile.md](platform-mobile.md) | `platform/native`, `platform/input`, `platform/storage` | 🟡 M6 — Web fertig, native Builds brauchen einen Mac |
+| [audio.md](audio.md) | `platform/audio` | 🟢 M7 fertig |
+| [onboarding.md](onboarding.md) | `content/hints`, `game/base/onboarding` | 🟢 M7 fertig |
 
 ## Aufbau jeder Modul-Doku
 

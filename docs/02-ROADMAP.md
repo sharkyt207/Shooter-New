@@ -18,7 +18,7 @@ erst dann das nächste. Kein paralleles Anfangen von Baustellen.
 | **M4** | Welt & Anomalien | Fragment-Generator v2, alle 5 Anomalien, Wetter/Licht | ✅ fertig |
 | **M5** | Meta: Basis, Crafting, Economy | Basisausbau, Werkbänke, Händler, Schwarzmarkt | ✅ fertig |
 | **M6** | Mobile-Härtung | Capacitor, Performance-Pass, Touch-Politur | 🟡 Web fertig, native Builds brauchen einen Mac |
-| **M7** | Content & Art-Pass | Finale Assets, Audio, Onboarding, Lokalisierung | 🔜 als nächstes |
+| **M7** | Content & Art-Pass | Audio, Onboarding, erste echte Assets, Store-Texte | 🟡 Lokalisierung offen |
 | **M8** | Live-Vorbereitung | Telemetrie, Balancing-Tools, optional PvP-Modul, Store-Release | ⏳ geplant |
 
 ---
@@ -232,13 +232,50 @@ bleiben.
 
 **Doku:** `docs/modules/platform-mobile.md`
 
-## M7 — Content & Art-Pass (nächster Schritt)
+## M7 — Content & Art-Pass 🟡
 
-- Finale Assets ersetzen Platzhalter (Figma/Substance → Atlas)
-- Audio: Ambient-Layer, Materialfootsteps, Waffen, Anomalien, adaptive Musik
-- Onboarding & Tutorial-Raid
-- Lokalisierung DE/EN (Strings sind ab Tag 1 zentralisiert)
-- App-Store-Assets: Icon, Screenshots, Trailer, Beschreibung
+**Ziel:** Das Spiel hört auf, wie ein Prototyp zu klingen und auszusehen.
+
+| Feature | Umfang |
+|---------|--------|
+| Audio | WebAudio-Adapter mit **prozeduraler** Synthese: 26 Stimmen, Ambience mit Drift, Positionston, Kompressor, Stimmenlimit, Autoplay-Entsperrung |
+| Ton im Spiel | Schüsse nach Waffenklasse, Einschläge, Tod, Alarm, Nachladen, Ladehemmung, Anomalien, Türen, Extraktion — und ein Klick für jeden Knopf |
+| Onboarding | 13 Hinweise, die auf die **Situation** feuern, einmal für immer, mit Prioritäts-Warteschlange |
+| Erste echten Assets | Riss-Emblem aus Canva, über das Manifest geladen — Hauptmenü und App-Icon aus einer Quelle |
+| Store-Auftritt | `docs/10-STORE-LISTING.md`: Beschreibung, Schlüsselwörter, Altersfreigabe-Begründung, Screenshot-Plan |
+
+**Der Asset-Vertrag ist eingelöst**
+
+`ui.emblem` ist der erste echte Asset-Eintrag im Manifest. Eine Datei nach
+`public/assets/ui/`, eine Zeile in `manifest.json` — **keine Codeänderung**.
+Genau das, was ADR-008 seit M0 versprochen hatte, jetzt an einem realen Asset
+nachgewiesen. Dieselbe Datei ist das App-Icon (`resources/icon.png`).
+
+**Eine Korrektur an dieser Roadmap**
+
+Der M7-Eintrag behauptete „Strings sind ab Tag 1 zentralisiert". Das war
+falsch: Die Texte stehen deutsch und direkt in den Bildschirmen. Die
+Lokalisierung ist damit kein Nachziehen, sondern eine echte Extraktion über
+alle Screens — sie steht noch aus und ist der Grund, warum M7 auf 🟡 steht.
+
+**Was Canva liefern konnte und was nicht**
+
+Die Wortmarke misslang zuverlässig: Die generative Schrifterzeugung
+verdoppelte „PROJECT ECHO" dreimal im selben Bild. Ein wortloses Emblem
+umgeht das Problem vollständig — und ist ohnehin das Richtige, weil ein
+App-Icon mit Schrift bei 60 px unlesbar ist. Die Typografie macht das Spiel
+selbst, mit echter Schrift.
+
+Ein transparenter PNG-Export braucht einen kostenpflichtigen Canva-Plan; der
+Hintergrund wird stattdessen im CSS per `screen` und Radialmaske entfernt.
+
+**Offen in M7**
+
+- **Lokalisierung DE/EN** — Extraktion aller Strings, siehe oben
+- Finale Spielgrafik (Figma/Substance): braucht eine Gestalterin, nicht einen
+  Generator. Die Pipeline dafür steht und ist nachgewiesen.
+- Materialabhängige Schritte und adaptive Musik
+- Trailer, Splash-Screen (2732×2732), Play-Symbolbild
 
 ## M8 — Live-Vorbereitung
 

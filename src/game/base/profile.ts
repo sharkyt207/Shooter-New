@@ -105,6 +105,8 @@ export interface PlayerProfile {
   /** Insured gear in transit back to the base. */
   insuranceReturns: InsuranceReturn[];
   quest: QuestProgress;
+  /** Onboarding hints already shown. A hint fires once, ever (M7). */
+  seenHints: string[];
 }
 
 /** Stash capacity granted by the current level of the stash module. */
@@ -169,6 +171,7 @@ export function createDefaultProfile(): PlayerProfile {
     contractsRolledAt: 0,
     insuranceReturns: [],
     quest: { stage: 0, progress: 0 },
+    seenHints: [],
   };
 }
 

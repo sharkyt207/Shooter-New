@@ -17,6 +17,7 @@ import { findAttachment } from '@/content/attachments';
 import { findBaseModule, findRecipe } from '@/content/baseModules';
 import { findContractTemplate } from '@/content/contracts';
 import { findTrader } from '@/content/traders';
+import { ALL_HINT_IDS } from '@/content/hints';
 import type { AttachmentLoadout } from '@/content/types';
 import { clamp01 } from '@/core/math/scalar';
 
@@ -166,6 +167,12 @@ function validateProfile(input: unknown, notes: string[]): PlayerProfile {
       stage: Math.max(0, Math.floor(numberOr(raw.quest?.stage, 0))),
       progress: Math.max(0, numberOr(raw.quest?.progress, 0)),
     },
+    // An unknown hint id is dropped: content removed it, so it can never fire.
+    seenHints: Array.isArray(raw.seenHints)
+      ? raw.seenHints.filter(
+          (id): id is string => typeof id === 'string' && ALL_HINT_IDS.includes(id),
+        )
+      : [],
   };
 
   profile.stash = createInventory(

@@ -809,3 +809,36 @@ button {
   color: var(--color-echo);
   animation: pulse 2s ease-in-out infinite;
 }
+
+/* ── Brand ──────────────────────────────────────────────────────────────── */
+/*
+ * The emblem is optional: it appears when the manifest registers real art and
+ * is simply absent otherwise. The layout must look deliberate either way, which
+ * is why the gap lives on the container rather than as a margin on the image.
+ */
+.menu__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.menu__emblem {
+  width: clamp(96px, 18vh, 168px);
+  height: auto;
+  /*
+   * The export has a near-black background rather than transparency (a
+   * transparent PNG needs a paid Canva plan). `screen` gets most of the way
+   * there, but it never darkens - so the near-black square still lifted very
+   * slightly above the menu's gradient and read as a visible box.
+   *
+   * The radial mask is what actually removes it: the mark lives in the middle
+   * of the canvas, so fading the outer third to transparent deletes exactly the
+   * part that was showing. Works regardless of what the background does.
+   */
+  mix-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 34%, transparent 66%);
+  mask-image: radial-gradient(circle at 50% 50%, #000 34%, transparent 66%);
+  filter: drop-shadow(0 0 24px rgba(56, 225, 212, 0.35));
+  pointer-events: none;
+}

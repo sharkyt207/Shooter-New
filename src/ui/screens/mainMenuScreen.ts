@@ -7,6 +7,7 @@
 
 import type { PlayerProfile } from '@/game/base/profile';
 import { levelFromXp } from '@/game/base/profile';
+import { assetUrl } from '@/ui/assets/uiAssets';
 import { el, formatCredits } from '@/ui/components/dom';
 import type { Screen } from '@/ui/uiRoot';
 
@@ -27,7 +28,12 @@ export function createMainMenuScreen(
     className: 'screen menu',
     children: [
       el('div', {
+        className: 'menu__brand',
         children: [
+          // The emblem comes from the manifest, so it is present when real art
+          // has been registered and simply absent when it has not. The menu is
+          // never broken by a missing file (ADR-008).
+          emblem(),
           el('h1', { className: 'title title--brand', text: 'Project Echo' }),
           el('p', {
             className: 'subtitle',
@@ -75,11 +81,21 @@ export function createMainMenuScreen(
           })
         : null,
 
-      el('div', { className: 'muted', text: `Version ${version} · Meilenstein M6` }),
+      el('div', { className: 'muted', text: `Version ${version} · Meilenstein M7` }),
     ],
   });
 
   return { root };
+}
+
+/** The rift mark, or nothing at all when no asset is registered. */
+function emblem(): HTMLElement | null {
+  const url = assetUrl('ui.emblem');
+  if (!url) return null;
+  return el('img', {
+    className: 'menu__emblem',
+    attrs: { src: url, alt: '', 'aria-hidden': 'true' },
+  });
 }
 
 function row(label: string, value: string): HTMLElement {

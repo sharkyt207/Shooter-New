@@ -16,7 +16,18 @@
     "Felder je Eintrag:",
     "  src     Pfad relativ zu public/assets/",
     "  anchor  [x, y] in 0..1 - Fusspunkt fuer die isometrische Tiefensortierung",
-    "  slice9  [links, oben, rechts, unten] - fuer skalierbare UI-Panels"
+    "  slice9  [links, oben, rechts, unten] - fuer skalierbare UI-Panels",
+    "",
+    "Erster echter Asset-Eintrag (M7): 'ui.emblem' kommt aus Canva.",
+    "Er beweist den Vertrag - eine Datei plus eine Zeile hier, kein Code."
   ],
-  "textures": {}
+  "textures": {
+    "ui.emblem": {
+      "src": "ui/emblem.png",
+      "anchor": [
+        0.5,
+        0.5
+      ]
+    }
+  }
 }

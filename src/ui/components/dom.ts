@@ -43,7 +43,14 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   const target: HTMLElement = node;
 
   if (options.onClick) {
-    target.addEventListener('click', options.onClick);
+    target.addEventListener('click', (event) => {
+      // One tap sound for every button in the game, registered here rather than
+      // at each of the ~60 call sites. Quiet on purpose: a menu that clicks
+      // loudly gets the whole game muted, and then the sounds that matter go
+      // with it.
+      if (tag === 'button') uiFeedback?.('ui.tap');
+      options.onClick?.(event);
+    });
   }
 
   if (options.onHold) {
@@ -117,4 +124,19 @@ export function formatWeight(kg: number): string {
 
 export function formatCredits(value: number): string {
   return `${formatNumber(value)} ¢`;
+}
+
+/**
+ * Where a button tap goes.
+ *
+ * A function reference rather than an import, because `ui` must not reach into
+ * `platform` for a service the app already owns - the app injects it once at
+ * startup and the DOM helper stays a pure builder.
+ */
+type UiFeedback = (id: 'ui.tap') => void;
+
+let uiFeedback: UiFeedback | null = null;
+
+export function setUiFeedback(feedback: UiFeedback | null): void {
+  uiFeedback = feedback;
 }

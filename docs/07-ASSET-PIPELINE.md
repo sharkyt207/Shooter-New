@@ -163,3 +163,41 @@ nicht wie ein Programmierer-Testbild.
   Grafiken in Phase P2 durch eigene, uneingeschränkt lizenzierte Assets ersetzt.
 - Schriftarten separat lizenzieren (SIL OFL bevorzugt: Inter, Barlow — beide frei kommerziell nutzbar).
 - Ein Lizenznachweis pro Asset in `public/assets/CREDITS.md` ab Phase P1.
+
+---
+
+## Nachweis (M7)
+
+Der erste echte Asset-Eintrag ist da: `ui.emblem`, das Riss-Zeichen aus Canva.
+
+Was dafür nötig war:
+
+1. `public/assets/ui/emblem.png` ablegen
+2. In `public/assets/manifest.json` eintragen:
+   ```json
+   "ui.emblem": { "src": "ui/emblem.png", "anchor": [0.5, 0.5] }
+   ```
+
+Was **nicht** nötig war: eine Codeänderung. Weder im Renderer noch im
+Hauptmenü. Genau das war der Vertrag seit M0 (ADR-008), jetzt an einem realen
+Asset nachgewiesen statt behauptet.
+
+### Zwei Consumer, ein Manifest
+
+Der Renderer löst Keys zu Pixi-Texturen auf (`render/assets/assetRegistry.ts`),
+die DOM-Oberfläche zu URLs (`ui/assets/uiAssets.ts`). Beide lesen dieselbe
+Datei. Ein Logo-Pfad im Stylesheet wäre der zweite Ort für Dateipfade gewesen,
+und der zweite Ort ist der, an dem die Regel zu verrotten beginnt.
+
+### Grenzen von Canva, gemessen statt vermutet
+
+- **Wortmarken misslingen.** Die generative Schrifterzeugung verdoppelte
+  „PROJECT ECHO" dreimal im selben Bild. Für alles mit Typografie ist Canva in
+  dieser Form unbrauchbar — was kein Verlust ist, denn Schrift zeichnet das
+  Spiel ohnehin selbst.
+- **Wortlose Zeichen gelingen.** Das Emblem traf Palette, Motiv und Stimmung
+  auf Anhieb.
+- **Transparenz kostet.** PNG-Export mit transparentem Hintergrund braucht
+  einen kostenpflichtigen Plan. Behelf: `mix-blend-mode: screen` plus eine
+  Radialmaske im CSS — die den Rand zuverlässiger entfernt als Transparenz es
+  getan hätte, weil sie unabhängig vom Hintergrund funktioniert.

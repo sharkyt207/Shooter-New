@@ -11,6 +11,7 @@
 
 import { Application } from 'pixi.js';
 import { findItem } from '@/content/items';
+import { findWeapon } from '@/content/weapons';
 import { createLogger } from '@/core/util/logger';
 import { FixedClock } from '@/core/time/fixedClock';
 import { addItem, countItem } from '@/game/inventory/inventory';
@@ -21,6 +22,8 @@ import {
   type BuildFailure,
 } from '@/game/base/buildQueue';
 import { advanceQuest } from '@/game/base/questLine';
+import { takeHint } from '@/game/base/onboarding';
+import type { HintDef, HintTrigger } from '@/content/hints';
 import {
   collectCrafts,
   startCraft,
@@ -45,7 +48,10 @@ import { secureCapacityKg } from '@/game/player/loadout';
 import { applyDisplayPreferences, bindLifecycle } from '@/platform/native/appLifecycle';
 import { createHaptics, NullHaptics, type HapticsService } from '@/platform/native/haptics';
 import { isTouchDevice } from '@/platform/native/nativeBridge';
-import { NullAudio, type AudioService } from '@/platform/audio/audioService';
+import type { AudioService } from '@/platform/audio/audioService';
+import { createAudio } from '@/platform/audio/webAudio';
+import { setUiFeedback } from '@/ui/components/dom';
+import { loadUiAssets } from '@/ui/assets/uiAssets';
 import { CompositeInput } from '@/platform/input/inputSource';
 import { KeyboardMouseInput } from '@/platform/input/keyboardMouseInput';
 import { TouchInput } from '@/platform/input/touchInput';
@@ -127,6 +133,9 @@ export class Game {
 
   private paused = false;
   private inventoryOpen = false;
+  /** Onboarding hints waiting for the banner to free up. */
+  private readonly hintQueue: HintDef[] = [];
+  private hintUntil = 0;
   private readonly settings = { debug: false, leftHanded: false };
 
   constructor(private readonly options: GameOptions) {
@@ -134,7 +143,9 @@ export class Game {
     // A synchronous fallback so the field is never undefined; `start()` swaps in
     // the best adapter this build can actually reach.
     this.storage = options.storage ?? new LocalStorageAdapter();
-    this.audio = options.audio ?? new NullAudio();
+    // Real audio since M7. `NullAudio` stays as the injectable stub for tests
+    // and for any environment that forbids an AudioContext.
+    this.audio = options.audio ?? createAudio();
   }
 
   // ── Boot ─────────────────────────────────────────────────────────────────
@@ -161,7 +172,9 @@ export class Game {
 
     this.placeholders = new PlaceholderFactory(this.app.renderer);
     this.assets = new AssetRegistry(this.placeholders);
-    await this.assets.load();
+    // Both layers read the same manifest: the renderer for textures, the DOM
+    // overlay for URLs. One place for paths, two consumers (ADR-008).
+    await Promise.all([this.assets.load(), loadUiAssets()]);
 
     this.renderer = new WorldRenderer(this.assets, this.placeholders);
     this.app.stage.addChild(this.renderer.stage);
@@ -185,7 +198,11 @@ export class Game {
 
     this.app.ticker.add((ticker) => this.frame(ticker.deltaMS / 1000));
 
+    // Give every button its tap sound without touching sixty call sites.
+    setUiFeedback((id) => this.audio.play(id));
+
     this.states.transitionTo('menu');
+    this.audio.setAmbience('menu');
     log.info(`PROJECT ECHO ${VERSION} gestartet.`);
   }
 
@@ -230,8 +247,12 @@ export class Game {
     this.renderer.update(frozen ? 1 : this.clock.alpha, dt, state.aimX, state.aimY);
     this.keyboard.setAimAnchor(this.renderer.playerScreenX, this.renderer.playerScreenY);
 
+    this.drainHints();
+
     this.hudViewModel = buildHudViewModel(sim);
     this.hud?.update(this.hudViewModel, sim.grid);
+    // Where the player is, is where the ear is.
+    this.audio.setListener(this.hudViewModel.playerX, this.hudViewModel.playerY);
 
     if (sim.finished) this.finishRaid();
   }
@@ -564,6 +585,8 @@ export class Game {
     this.paused = false;
     this.inventoryOpen = false;
     this.clock.reset();
+    this.hintQueue.length = 0;
+    this.hintUntil = 0;
 
     const sim = new RaidSimulation({ seed: this.pendingSeed, loadout: this.profile.loadout });
     this.sim = sim;
@@ -598,6 +621,75 @@ export class Game {
   }
 
   private subscribeToRaid(sim: RaidSimulation): void {
+    // Gunfire is the loudest thing in the game and the one the player uses to
+    // judge distance, so it is positional and keyed by weapon class.
+    sim.bus.on('weapon:fired', (event) => {
+      const weapon = findWeapon(event.weaponId);
+      const id =
+        weapon?.weaponClass === 'shotgun'
+          ? 'weapon.fire.shotgun'
+          : weapon?.weaponClass === 'marksman'
+            ? 'weapon.fire.marksman'
+            : 'weapon.fire.smg';
+      this.audio.play(id, {
+        x: event.x,
+        y: event.y,
+        // A little pitch variation, or a held trigger turns into a machine.
+        rate: 0.94 + ((event.entity * 37) % 13) * 0.01,
+      });
+    });
+
+    sim.bus.on('projectile:impact', (event) => {
+      this.audio.play(event.surface === 'actor' ? 'impact.flesh' : 'impact.wall', {
+        x: event.x,
+        y: event.y,
+      });
+    });
+
+    sim.bus.on('entity:died', (event) => {
+      this.audio.play('enemy.die', { x: event.x, y: event.y });
+    });
+
+    // The single sound a player must never miss.
+    sim.bus.on('ai:alerted', (event) => {
+      this.audio.play('enemy.alert', { x: event.x, y: event.y });
+    });
+
+    sim.bus.on('melee:swing', (event) => {
+      this.audio.play('weapon.dryfire', { x: event.x, y: event.y, volume: 0.6 });
+    });
+
+    sim.bus.on('extraction:progress', () => this.audio.play('extraction.progress'));
+
+    // ── Onboarding ─────────────────────────────────────────────────────────
+    // Hints fire on the *situation*, once ever. There is no sequence to follow
+    // and nothing to fail: a player who never gets shot never sees the hint
+    // about getting shot, and has lost nothing (docs/modules/onboarding.md).
+    this.showHint('raidStarted');
+
+    sim.bus.on('ai:alerted', () => this.showHint('firstContact'));
+    sim.bus.on('container:searchStarted', () => this.showHint('firstContainer'));
+    sim.bus.on('loot:pickedUp', () => this.showHint('firstLoot'));
+    sim.bus.on('anomaly:entered', () => this.showHint('firstAnomaly'));
+    sim.bus.on('door:locked', () => this.showHint('firstLockedDoor'));
+    sim.bus.on('weapon:jammed', () => this.showHint('firstJam'));
+    sim.bus.on('extraction:opened', () => this.showHint('extractionOpened'));
+    sim.bus.on('boss:engaged', () => this.showHint('firstBoss'));
+    sim.bus.on('raid:timeWarning', () => this.showHint('timeWarning'));
+
+    sim.bus.on('loot:rejected', (event) => {
+      if (event.reason === 'overweight') this.showHint('overweight');
+    });
+
+    sim.bus.on('damage:dealt', (event) => {
+      if (!event.isPlayerTarget) return;
+      this.showHint('firstDamage');
+    });
+
+    sim.bus.on('player:healthChanged', (event) => {
+      if (event.max > 0 && event.current / event.max < 0.3) this.showHint('lowHealth');
+    });
+
     sim.bus.on('extraction:opened', (event) => {
       this.hud?.showBanner(`${event.name} offen`);
       this.audio.play('extraction.open');
@@ -680,7 +772,7 @@ export class Game {
     this.sim?.dispose();
     this.sim = null;
     this.hudViewModel = null;
-    this.audio.setAmbience(null);
+    this.audio.setAmbience('base');
   }
 
   private finishRaid(): void {
@@ -732,6 +824,39 @@ export class Game {
 
     if (existing) existing.quantity += delta;
     else slots.push({ itemId, quantity: delta });
+  }
+
+  /**
+   * Show a hint if this situation has not come up before.
+   *
+   * Uses the banner rather than a toast: a hint is worth a beat of the player's
+   * attention, and the banner is the one element already reserved for exactly
+   * that. Saving is deferred to the next ordinary save - a hint is not worth a
+   * write to storage mid-fight.
+   *
+   * Hints queue instead of overwriting each other. A first firefight can easily
+   * trigger contact, damage and low health within a second, and a hint the
+   * player never got to read is worse than no hint at all - it consumed its one
+   * chance to be shown.
+   */
+  private showHint(trigger: HintTrigger): void {
+    const hint = takeHint(this.profile, trigger);
+    if (!hint) return;
+
+    this.hintQueue.push(hint);
+    // Most urgent first: low health outranks "containers make noise".
+    this.hintQueue.sort((a, b) => b.priority - a.priority);
+    this.drainHints();
+  }
+
+  private drainHints(): void {
+    if (this.hintUntil > performance.now()) return;
+
+    const hint = this.hintQueue.shift();
+    if (!hint) return;
+
+    this.hintUntil = performance.now() + hint.seconds * 1000;
+    this.hud?.showBanner(hint.text, hint.seconds * 1000);
   }
 
   /** Surface what the settlement did beyond moving loot. */
