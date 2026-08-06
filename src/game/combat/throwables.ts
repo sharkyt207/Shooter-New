@@ -160,6 +160,7 @@ function detonate(
       // a distinction worth modelling.
       applyDamage(ctx, entity, owner, def.damage * falloff * falloff, transform.x, transform.y, {
         zone: null,
+        cause: 'explosion',
       });
     }
 

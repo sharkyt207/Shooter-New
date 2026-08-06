@@ -107,7 +107,7 @@ function applyContinuousEffects(ctx: SimContext, intensity: number): void {
               ANOMALY.stillnessCoreDamagePerSecond * intensity * dt,
               transform.x,
               transform.y,
-              { zone: null },
+              { zone: null, cause: 'anomaly' },
             );
           }
           break;
@@ -121,7 +121,7 @@ function applyContinuousEffects(ctx: SimContext, intensity: number): void {
             ANOMALY.bleachDrainPerSecond * depth * intensity * dt,
             transform.x,
             transform.y,
-            { zone: null },
+            { zone: null, cause: 'anomaly' },
           );
           break;
 
@@ -203,7 +203,7 @@ function updateRecoil(
       ANOMALY.recoilPulseDamage * falloff * falloff * intensity,
       actorTransform.x,
       actorTransform.y,
-      { zone: null },
+      { zone: null, cause: 'anomaly' },
     );
   }
 }

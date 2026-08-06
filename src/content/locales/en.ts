@@ -488,4 +488,36 @@ export const EN: Catalogue = {
   hoch: 'high',
   extrem: 'extreme',
   Behälter: 'Container',
+
+  // ── Diagnostics (M8) ─────────────────────────────────────────────────────
+  // "Diagnose" is the screen, not a medical diagnosis: "Diagnostics" carries
+  // the instrumentation sense that "Diagnosis" would lose.
+  Diagnose: 'Diagnostics',
+  'Diese Zahlen bleiben auf diesem Gerät. Sie werden nicht gesendet, nicht geteilt und nicht ausgewertet — sie sind nur hier.':
+    'These figures stay on this device. Nothing is sent, shared or analysed — they exist only here.',
+  'Noch keine Raids aufgezeichnet.': 'No raids recorded yet.',
+  Konfiguration: 'Configuration',
+  'Balance-Version': 'Balance version',
+  'Aufgezeichnete Raids': 'Raids recorded',
+  'Raids insgesamt': 'Raids in total',
+  'Aufzeichnung löschen': 'Delete recording',
+  'Alle aufgezeichneten Zahlen löschen? Der Spielfortschritt bleibt erhalten.':
+    'Delete every recorded figure? Your progress is untouched.',
+  Ausgang: 'Outcome',
+  'Ø Dauer': 'Avg. duration',
+  'Ø Wert je Raid': 'Avg. value per raid',
+  'Längste Verlustserie': 'Longest losing streak',
+  '{count} Raid': '{count} raid',
+  '{count} Raids': '{count} raids',
+  Kampf: 'Combat',
+  'Ø Abschüsse': 'Avg. kills',
+  'Treffer je Schuss': 'Hits per shot',
+  'Ø erlittener Schaden': 'Avg. damage taken',
+  'Boss angetroffen': 'Boss encountered',
+  Todesursachen: 'Causes of death',
+  'Noch kein Verlust.': 'Nothing lost yet.',
+  Beschuss: 'Gunfire',
+  Explosion: 'Explosion',
+  Anomalie: 'Anomaly',
+  Unbekannt: 'Unknown',
 };

@@ -341,3 +341,79 @@ nach ADR-002 keine kennen darf. Konsequenz daraus: Die Simulation liefert
 Bestandteile (Name, Menge), nicht fertige Sätze, sonst ließe sich die Sprache
 erst zwischen zwei Raids wechseln. Die gewählte Sprache liegt **außerhalb** des
 Profils, denn sie gehört zur Person, nicht zur Spielfigur.
+
+---
+
+## ADR-017 — Telemetrie bleibt auf dem Gerät
+
+**Status:** akzeptiert (M8)
+
+**Kontext.** `docs/02-ROADMAP.md` sieht für M8 „Telemetrie: Retention,
+Raid-Ausgang, Todesursachen, Economy-Drift" vor. Der übliche Weg ist ein
+Analyse-Dienst: SDK einbinden, Ereignisse senden, Diagramme im Webbrowser lesen.
+
+**Entscheidung.** Die Zahlen werden erhoben, aber **nicht gesendet**. Sie liegen
+im Gerätespeicher (Schlüssel `telemetry`, 50 Raids im Ringpuffer) und werden dem
+Spieler auf einem Bildschirm im Spiel gezeigt, den er löschen kann. Es gibt kein
+Analyse-SDK, keine Kennung, keinen Endpunkt.
+
+**Begründung.**
+
+1. **Der Preis wäre nicht technisch, sondern rechtlich.** Ein Analyse-Dienst
+   kippt die Datenschutzangaben bei Apple und Google von „keine Daten" auf eine
+   Liste, verlangt eine Datenschutzerklärung mit Auftragsverarbeiter und
+   möglicherweise ein Einwilligungsbanner — für ein Einzelspielerspiel ohne
+   Konto, ohne Chat und ohne Käufe.
+2. **Der Nutzen ist kleiner als er klingt.** Aggregierte Ausgangsquoten von
+   tausend Spielern sagen dasselbe wie die von einem, der oft spielt, sofern
+   sie *lesbar* sind. Also werden sie lesbar gemacht.
+3. **Ein Bildschirm ist die stärkere Datenschutzerklärung.** „Wir erheben
+   nichts" muss man glauben. „Hier steht alles, was gespeichert ist, und hier
+   ist die Löschtaste" kann man nachsehen.
+
+**Konsequenzen.** `game/telemetry` ist ein reiner Ereignis-Konsument ohne Uhr
+und ohne Speicherzugriff; `app/` besitzt beides (ADR-002). Die Aufzeichnung
+liegt **außerhalb** des Profils — ein Profil-Reset ist genau der Moment, in dem
+die Historie am interessantesten ist. `docs/11-COMPLIANCE.md` beantwortet die
+Store-Formulare aus diesem ADR heraus; ändert sich die Entscheidung, ändert sich
+dieses Dokument zuerst.
+
+---
+
+## ADR-018 — Balance-Zahlen sind überschreibbar, aber nur in Grenzen
+
+**Status:** akzeptiert (M8)
+
+**Kontext.** Ein Store-Review dauert Tage. Eine Waffe, die 15 % zu stark ist,
+sollte keine Tage kosten. Gleichzeitig ist eine Konfiguration von außen ein
+Einfallstor: Sie kommt über das Netz, sie wird nicht kompiliert, und sie wird
+von der Simulation ohne weitere Prüfung geglaubt.
+
+**Entscheidung.** Ein Patch aus `content/balanceOverlay.ts` legt sich beim Start
+über `balance.ts`. Er darf nur vorhandene Zahlen bewegen, nur um höchstens
+Faktor `MAX_FACTOR` (5), nur unter Beibehaltung des Vorzeichens, und nur einmal
+je Sitzung. Alles andere wird mit begründeter Meldung verworfen; der Rest des
+Patches gilt trotzdem.
+
+**Begründung.**
+
+1. **Die Grenze ist ein Explosionsradius, keine Designvorgabe.** Faktor 5 deckt
+   jede Balance-Entscheidung ab, die jemand tatsächlich treffen würde.
+   `PLAYER.maxHealth: 0` deckt sie nicht ab — das ist kein Balancing, das ist
+   ein Ausfall, ausgelöst aus der Ferne.
+2. **Unbekannte Schlüssel zu erfinden ist schlimmer als sie abzulehnen.** Ein
+   Tippfehler, der still eine neue Konstante anlegt, wird eine Woche lang für
+   einen Fehler im Spiel gehalten.
+3. **Nur beim Start, weil ein Raid je Seed reproduzierbar sein muss** (ADR-009).
+   Ein Patch, der mitten in einer Sitzung ankommt, macht aus einem Seed zwei
+   verschiedene Spiele.
+4. **Struktur ist kein Konfigurationswert.** `META.reputationTiers` ist ein
+   Array; wer daran etwas ändert, ändert Spielregeln, nicht Beträge. Solche
+   Schlüssel werden abgelehnt.
+
+**Konsequenzen.** Kein Modul darf einen Balance-Wert beim Laden in eine eigene
+Konstante kopieren — der Patch würde dort nie ankommen, und die Konfiguration
+wäre nachweislich korrekt. Ein Test durchsucht den Quelltext nach diesem Muster.
+Die aktive `balanceVersion()` wird auf jeden Telemetrie-Datensatz gestempelt,
+damit eine Verschiebung in der Extraktionsquote zugeordnet und nicht vermutet
+wird.

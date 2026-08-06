@@ -13,6 +13,17 @@ import { Application } from 'pixi.js';
 import { findItem } from '@/content/items';
 import { findWeapon } from '@/content/weapons';
 import { createLogger } from '@/core/util/logger';
+import { applyBalanceOverlay, balanceVersion } from '@/content/balanceOverlay';
+import { createRemoteConfig } from '@/platform/config/remoteConfig';
+import {
+  createRaidRecorder,
+  emptyTelemetry,
+  parseTelemetry,
+  recordRaid,
+  summarise,
+  type RaidRecorder,
+  type TelemetryState,
+} from '@/game/telemetry/telemetry';
 import { FixedClock } from '@/core/time/fixedClock';
 import { addItem, countItem } from '@/game/inventory/inventory';
 import { createDefaultProfile, type PlayerProfile } from '@/game/base/profile';
@@ -80,6 +91,7 @@ import { createBriefingScreen } from '@/ui/screens/briefingScreen';
 import { createInventoryOverlay } from '@/ui/screens/inventoryOverlay';
 import { createLoadoutScreen } from '@/ui/screens/loadoutScreen';
 import { createMainMenuScreen } from '@/ui/screens/mainMenuScreen';
+import { createDiagnosticsScreen } from '@/ui/screens/diagnosticsScreen';
 import { createPauseOverlay } from '@/ui/screens/pauseOverlay';
 import { createResultScreen } from '@/ui/screens/resultScreen';
 import { createWorkshopScreen } from '@/ui/screens/workshopScreen';
@@ -105,6 +117,14 @@ const CRAFT_MESSAGES: Record<CraftFailure, string> = {
 
 /** Storage key for the chosen language. Deliberately outside the profile. */
 const LOCALE_KEY = 'locale';
+/**
+ * Telemetry lives outside the profile.
+ *
+ * It describes how the *game* behaves, not how a character is doing. Wiping a
+ * profile to start over is exactly the moment the balancing history becomes
+ * most interesting, so it must survive that.
+ */
+const TELEMETRY_KEY = 'telemetry';
 
 const log = createLogger('game');
 const VERSION = '0.1.0';
@@ -145,6 +165,9 @@ export class Game {
   private paused = false;
   private inventoryOpen = false;
   /** Onboarding hints waiting for the banner to free up. */
+  private telemetry: TelemetryState = emptyTelemetry();
+  private recorder: RaidRecorder | null = null;
+
   private readonly hintQueue: HintDef[] = [];
   private hintUntil = 0;
   private readonly settings: { debug: boolean; leftHanded: boolean; locale: Locale } = {
@@ -180,6 +203,10 @@ export class Game {
     this.haptics = await createHaptics();
     await applyDisplayPreferences();
 
+    // Balance numbers before the first simulation exists. A patch that arrived
+    // mid-session would make a raid unreproducible from its seed (ADR-018).
+    await this.applyRemoteBalance();
+
     await this.app.init({
       background: 0x080a0f,
       resizeTo: window,
@@ -206,6 +233,7 @@ export class Game {
     this.input.attach();
 
     await this.loadProfile();
+    await this.loadTelemetry();
     this.registerStates();
     this.installLifecycleHooks();
 
@@ -290,6 +318,22 @@ export class Game {
               this.profile = createDefaultProfile();
               void this.saveProfile();
               this.states.transitionTo('base');
+            },
+            onDiagnostics: () => this.states.transitionTo('diagnostics'),
+          }),
+        );
+      },
+    });
+
+    this.states.register('diagnostics', {
+      enter: () => {
+        this.ui.setScreen(
+          createDiagnosticsScreen(summarise(this.telemetry), balanceVersion(), {
+            onBack: () => this.states.transitionTo('menu'),
+            onClear: () => {
+              this.telemetry = emptyTelemetry();
+              void this.saveTelemetry();
+              this.states.reenter();
             },
           }),
         );
@@ -654,6 +698,11 @@ export class Game {
     this.subscribeToRaid(sim);
 
     sim.start();
+    // After start(), because the player entity does not exist before it.
+    const player = sim.world.playerEntity;
+    if (player !== null) {
+      this.recorder = createRaidRecorder(sim.bus, this.pendingSeed, balanceVersion(), player);
+    }
     this.audio.setAmbience('raid');
   }
 
@@ -809,6 +858,11 @@ export class Game {
   }
 
   private exitRaid(): void {
+    // Abandoned, reloaded, or already recorded by finishRaid(). Either way the
+    // listeners have to go, or the next raid inherits them.
+    this.recorder?.cancel();
+    this.recorder = null;
+
     this.ui.clearOverlays();
     this.ui.setHud(null);
     this.hud?.destroy();
@@ -824,6 +878,12 @@ export class Game {
   private finishRaid(): void {
     const outcome = this.sim?.outcome;
     if (!outcome) return;
+
+    if (this.recorder) {
+      this.telemetry = recordRaid(this.telemetry, this.recorder.finish(outcome));
+      this.recorder = null;
+      void this.saveTelemetry();
+    }
 
     this.lastReport = settleRaid(this.profile, outcome, Date.now());
     this.reportSettlement(this.lastReport);
@@ -1107,6 +1167,40 @@ export class Game {
 
   private async saveProfile(): Promise<void> {
     await this.storage.set(SAVE_KEY, serialize(createSave(this.profile, Date.now())));
+  }
+
+  private async loadTelemetry(): Promise<void> {
+    this.telemetry = parseTelemetry(await this.storage.get(TELEMETRY_KEY));
+  }
+
+  private async saveTelemetry(): Promise<void> {
+    await this.storage.set(TELEMETRY_KEY, JSON.stringify(this.telemetry));
+  }
+
+  /**
+   * Take balance numbers from a config server, if this build has one.
+   *
+   * Silent by design in the normal case: a build with no configured URL does
+   * nothing at all, and a reachable server that returns nothing usable is
+   * indistinguishable from that.
+   *
+   * Rejections are warnings so they survive the production log level, which is
+   * `Warn` (`main.ts`) - a config the server considers deployed and the game
+   * quietly ignored is the failure mode worth being loud about. "Which numbers
+   * am I playing with" is answered on the Diagnose screen instead of in a
+   * console line nobody can read on a phone.
+   */
+  private async applyRemoteBalance(): Promise<void> {
+    const patch = await createRemoteConfig().fetch();
+    if (patch === null) return;
+
+    const report = applyBalanceOverlay(patch);
+    if (report.applied.length > 0) {
+      log.info(`Balance-Konfiguration ${balanceVersion()}: ${report.applied.length} Werte angepasst.`);
+    }
+    for (const rejected of report.rejected) {
+      log.warn(`Balance-Konfiguration verworfen: ${rejected.group}.${rejected.key} (${rejected.reason})`);
+    }
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────

@@ -19,7 +19,7 @@ erst dann das nächste. Kein paralleles Anfangen von Baustellen.
 | **M5** | Meta: Basis, Crafting, Economy | Basisausbau, Werkbänke, Händler, Schwarzmarkt | ✅ fertig |
 | **M6** | Mobile-Härtung | Capacitor, Performance-Pass, Touch-Politur | 🟡 Web fertig, native Builds brauchen einen Mac |
 | **M7** | Content & Art-Pass | Audio, Onboarding, Lokalisierung DE/EN, erste echte Assets, Store-Texte | ✅ fertig |
-| **M8** | Live-Vorbereitung | Telemetrie, Balancing-Tools, optional PvP-Modul, Store-Release | ⏳ geplant |
+| **M8** | Live-Vorbereitung | Telemetrie, Balancing-Tools, Compliance, Store-Release | 🟡 Werkzeuge fertig, Release offen |
 
 ---
 
@@ -301,13 +301,68 @@ Hintergrund wird stattdessen im CSS per `screen` und Radialmaske entfernt.
 - Trailer, Splash-Screen (2732×2732), Play-Symbolbild
 - Englische Store-Texte (`docs/10-STORE-LISTING.md` ist deutsch)
 
-## M8 — Live-Vorbereitung
+## M8 — Live-Vorbereitung 🟡
 
-- Telemetrie: Retention, Raid-Ausgang, Todesursachen, Economy-Drift
-- Balancing über Remote-Config statt App-Update
-- Optional: PvP-Modul (autoritativer Server, Sim läuft dort deterministisch)
-- Store-Compliance, Datenschutz, Altersfreigabe
-- Release
+**Ziel:** Wissen, wie das Spiel läuft, und es korrigieren können, ohne auf ein
+Store-Review zu warten.
+
+| Feature | Umfang |
+|---------|--------|
+| Telemetrie | Ausgang, Todesursachen, Wirtschaftsdrift, Treffer je Schuss, längste Verlustserie — 50 Raids im Ringpuffer |
+| Diagnose-Bildschirm | Hauptmenü → Diagnose: die Zahlen lesbar, in beiden Sprachen, mit Löschtaste |
+| Balance-Overlay | Geprüfter Patch über `balance.ts`, Faktor-5-Grenze, Teilanwendung mit Begründung je Ablehnung |
+| Remote-Config | Nur mit `VITE_BALANCE_CONFIG_URL`; ohne sie existiert kein Netzwerkpfad |
+| Compliance | `docs/11-COMPLIANCE.md`: Store-Formulare, Altersfreigabe, Lizenzen |
+
+**Die Telemetrie verlässt das Gerät nicht — und das ist die Entscheidung**
+
+Ein Analyse-Dienst hätte die Datenschutzangaben bei Apple und Google von „keine
+Daten" auf eine Liste gekippt, samt Auftragsverarbeiter und womöglich
+Einwilligungsbanner. Für ein Einzelspielerspiel ohne Konto, ohne Chat und ohne
+Käufe ist das ein hoher Preis für Diagramme, die dasselbe sagen wie die Zahlen
+eines Spielers, der oft spielt. Also bleiben sie lokal und werden **lesbar**
+gemacht (ADR-017). Der Diagnose-Bildschirm ist bewusst nicht hinter einem
+Debug-Schalter: Er zeigt, was gespeichert ist, und löscht es auf Wunsch — eine
+überprüfbare Datenschutzerklärung statt einer behaupteten.
+
+**Gefundene und behobene Fehler dieses Meilensteins**
+
+- **Die Todesursache war nicht rekonstruierbar.** `entity:died` sagt *dass*,
+  `damage:dealt` sagte *wieviel*, aber nicht *wodurch*. `damage:dealt` trägt
+  jetzt eine `cause`, und sie ist an allen sechs Aufrufstellen pflichtig — sonst
+  wächst still ein Balken „Beschuss", der nie Beschuss war.
+- **Eine Ladezeit-Kopie hätte das ganze Overlay unterlaufen.**
+  `loadoutScreen.ts` zog sich beim Laden `META.insuranceReturnChance` in eine
+  eigene Konstante. Ein Patch wäre überall angekommen außer dort — bei
+  nachweislich korrekter Konfiguration. Ein Test durchsucht den Quelltext jetzt
+  nach diesem Muster.
+- **„1 Raids"** stand auf dem Diagnose-Bildschirm, weil ein Plural als Suffix im
+  Code klebte statt als eigene Quellzeichenkette. Gefunden im Browser, wie immer.
+
+**Nachgewiesen, nicht behauptet**
+
+Ein Build mit gesetzter `VITE_BALANCE_CONFIG_URL` hat eine echte HTTP-Antwort
+verarbeitet: zwei Werte übernommen, eine unbekannte Gruppe und einen Wert
+jenseits der Faktor-5-Grenze mit Begründung verworfen, und der
+Diagnose-Bildschirm wies danach `2026.2-probe` als aktive Balance-Version aus.
+
+**Doku:** `docs/modules/telemetry.md`, `docs/11-COMPLIANCE.md`
+
+**Offen in M8**
+
+- Ein Konfigurationsserver (eine statische Datei hinter einem CDN genügt)
+- Store-Material: Splash-Screen 2732×2732, Play-Symbolbild, Screenshots,
+  englische Store-Texte, Datenschutz-URL
+- **Release** — braucht einen Mac, Xcode, Signierzertifikate und Store-Konten;
+  die exakte Befehlsfolge steht in `docs/modules/platform-mobile.md`
+
+**Bewusst nicht gebaut**
+
+- **PvP.** Die Roadmap führte es als „optional". ADR-006 hält fest, warum es
+  zum Launch nicht kommt, und nichts an M8 hat daran etwas geändert: Ein
+  autoritativer Server ist ein Betriebsaufwand, kein Feature.
+- **Export der Aufzeichnung als Datei.** Ein Export ist der erste Schritt zum
+  Versand, und der Bildschirm liest sich bereits.
 
 ---
 

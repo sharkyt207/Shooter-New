@@ -12,6 +12,7 @@
 
 import { COMBAT } from '@/content/balance';
 import type { HitZone } from '@/content/types';
+import type { DamageCause } from '@/game/gameEvents';
 import type { EntityId } from '@/core/ecs/entity';
 import { clamp } from '@/core/math/scalar';
 import type { SimContext } from '@/game/simulation/simContext';
@@ -23,6 +24,12 @@ export interface DamageResult {
 }
 
 export interface DamageOptions {
+  /**
+   * What kind of harm this is. Required, and deliberately so: a new damage
+   * source has to say what it is, or the death-cause statistics quietly grow a
+   * bucket of "gunfire" that was never gunfire.
+   */
+  cause: DamageCause;
   /** Body part that was hit. Null for area damage. */
   zone?: HitZone | null;
   /** Damage the target's armour absorbed before this call. */
@@ -43,7 +50,7 @@ export function applyDamage(
   rawAmount: number,
   hitX: number,
   hitY: number,
-  options: DamageOptions = {},
+  options: DamageOptions,
 ): DamageResult {
   const { world } = ctx;
   result.applied = 0;
@@ -77,6 +84,7 @@ export function applyDamage(
     target,
     source,
     amount: dealt,
+    cause: options.cause,
     absorbed: result.absorbed,
     x: hitX,
     y: hitY,

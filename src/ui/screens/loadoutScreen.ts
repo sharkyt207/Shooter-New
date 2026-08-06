@@ -25,8 +25,6 @@ import { bar, clear, el, formatCredits, formatWeight } from '@/ui/components/dom
 import type { Screen } from '@/ui/uiRoot';
 import { t, tf } from '@/core/i18n/i18n';
 
-const INSURANCE_CHANCE = META.insuranceReturnChance;
-
 export interface LoadoutCallbacks {
   onBack(): void;
   onConfirm(): void;
@@ -409,7 +407,7 @@ function insurancePanel(profile: PlayerProfile, callbacks: LoadoutCallbacks): HT
       el('div', {
         className: 'muted',
         text: `Getragene Ausrüstung kommt bei einem Fehlschlag mit ${Math.round(
-          INSURANCE_CHANCE * 100,
+          META.insuranceReturnChance * 100,
         )} % Wahrscheinlichkeit nach ${returnMinutes(profile)} Minuten zurück. Beute nie.`,
       }),
       el('div', { style: { height: 'var(--space-2)' } }),

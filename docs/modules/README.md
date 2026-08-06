@@ -22,6 +22,7 @@ implementiert, getestet, optimiert **und** hier dokumentiert ist
 | [audio.md](audio.md) | `platform/audio` | 🟢 M7 fertig |
 | [onboarding.md](onboarding.md) | `content/hints`, `game/base/onboarding` | 🟢 M7 fertig |
 | [i18n.md](i18n.md) | `core/i18n`, `content/locales` | 🟢 M7 fertig |
+| [telemetry.md](telemetry.md) | `game/telemetry`, `content/balanceOverlay`, `platform/config` | 🟢 M8 Teil 1 |
 
 ## Aufbau jeder Modul-Doku
 

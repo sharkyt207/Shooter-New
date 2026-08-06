@@ -49,6 +49,7 @@ export function meleeAttack(ctx: SimContext, entity: EntityId): boolean {
   // whatever they are wearing, not a projectile trying to defeat a plate.
   applyDamage(ctx, entity === target ? entity : target, entity, damage, transform.x, transform.y, {
     zone: null,
+    cause: 'melee',
     wasUnaware: unaware,
     // The ambush bonus is already in `damage`; applying it twice would make a
     // knife strictly better than any weapon in the game.

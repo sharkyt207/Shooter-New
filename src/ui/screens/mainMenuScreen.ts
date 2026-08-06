@@ -15,6 +15,7 @@ import { t, tf } from '@/core/i18n/i18n';
 export interface MainMenuCallbacks {
   onContinue(): void;
   onNewProfile(): void;
+  onDiagnostics(): void;
 }
 
 export function createMainMenuScreen(
@@ -50,6 +51,14 @@ export function createMainMenuScreen(
             className: 'btn btn--primary btn--block',
             text: hasHistory ? t('Fortsetzen') : t('Riss betreten'),
             onClick: () => callbacks.onContinue(),
+          }),
+          // Shown from the first launch, unlike "Neues Profil" below. The
+          // screen states what is stored on the device and offers to delete
+          // it, which is most useful to someone who has not played yet.
+          el('button', {
+            className: 'btn btn--ghost btn--block',
+            text: t('Diagnose'),
+            onClick: () => callbacks.onDiagnostics(),
           }),
           hasHistory
             ? el('button', {

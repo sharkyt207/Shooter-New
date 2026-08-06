@@ -11,7 +11,15 @@
 
 import { createLogger } from '@/core/util/logger';
 
-export type GameState = 'boot' | 'menu' | 'base' | 'loadout' | 'briefing' | 'raid' | 'result';
+export type GameState =
+  | 'boot'
+  | 'menu'
+  | 'base'
+  | 'loadout'
+  | 'briefing'
+  | 'raid'
+  | 'result'
+  | 'diagnostics';
 
 export interface StateHandlers {
   enter?(): void;
@@ -23,12 +31,14 @@ export interface StateHandlers {
 /** Which states may follow which. Anything not listed is rejected. */
 const TRANSITIONS: Record<GameState, readonly GameState[]> = {
   boot: ['menu'],
-  menu: ['base'],
+  menu: ['base', 'diagnostics'],
   base: ['loadout', 'menu'],
   loadout: ['base', 'briefing'],
   briefing: ['loadout', 'raid'],
   raid: ['result'],
   result: ['base'],
+  // A dead end on purpose: it is a readout, and the only way out is back.
+  diagnostics: ['menu'],
 };
 
 const log = createLogger('state');

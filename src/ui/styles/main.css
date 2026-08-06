@@ -129,6 +129,22 @@ body {
   margin-top: var(--space-3);
 }
 
+/*
+ * Panels side by side where there is room, stacked where there is not.
+ * `auto-fit` rather than a fixed column count: a landscape phone gets two,
+ * a tablet three, and nothing has to know which device it is on.
+ */
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.panel-grid .panel + .panel {
+  margin-top: 0;
+}
+
 .panel__title {
   font-family: var(--font-display);
   font-size: 1rem;

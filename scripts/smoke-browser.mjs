@@ -169,11 +169,20 @@ try {
   await page.goto(URL_TARGET, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
 
-  console.log('  1/8 Hauptmenü');
+  console.log('  1/9 Hauptmenü');
   await shot('01-menu');
+
+  // The diagnostics readout, before anything has been recorded. This is the
+  // state a privacy-conscious player sees first, and the one no amount of
+  // playing would ever reproduce again.
+  console.log('  2/9 Diagnose');
+  await clickButton('Diagnose');
+  await shot('01b-diagnostics');
+  await clickButton('Zurück');
+
   await clickButton('Riss betreten');
 
-  console.log('  2/8 Basis');
+  console.log('  3/9 Basis');
   await shot('02-base');
 
   // Every base tab renders different systems (traders, the craft queue, the
@@ -190,21 +199,21 @@ try {
 
   await clickButton('Ausrüstung wählen');
 
-  console.log('  3/8 Ausrüstung');
+  console.log('  4/9 Ausrüstung');
   await shot('03-loadout');
 
-  console.log('  4/8 Werkstatt');
+  console.log('  5/9 Werkstatt');
   await clickButton('Werkstatt öffnen');
   await shot('04-workshop');
   await clickButton('Zurück');
   await clickButton('Riss betreten');
 
-  console.log('  5/8 Briefing');
+  console.log('  6/9 Briefing');
   await shot('05-briefing');
   await clickButton('Riss betreten');
   await page.waitForTimeout(1800);
 
-  console.log('  6/8 Raid');
+  console.log('  7/9 Raid');
   await shot('06-raid');
 
   // Exercise simulation and renderer together: move, aim, fire.
@@ -221,7 +230,7 @@ try {
 
   // The flashlight is the one renderer feature that is invisible unless the
   // raid happens to roll a dark weather, so the smoke test forces it on.
-  console.log('  7/8 Licht');
+  console.log('  8/9 Licht');
   const lightBtn = page.locator('button[aria-label="Licht"]').first();
   // The HUD redraws constantly under software rendering, and Playwright's
   // stability wait occasionally loses the element mid-click. A forced click
@@ -231,7 +240,7 @@ try {
   await page.waitForTimeout(500);
   await shot('09-light');
 
-  console.log('  8/8 Inventar');
+  console.log('  9/9 Inventar');
   await page.keyboard.press('Tab');
   await page.waitForTimeout(500);
   await shot('08-inventory');

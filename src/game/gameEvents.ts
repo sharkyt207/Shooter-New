@@ -40,6 +40,14 @@ export type GameEvents = {
     target: EntityId;
     source: EntityId;
     amount: number;
+    /**
+     * What kind of harm this was.
+     *
+     * Declared by the caller rather than inferred, because "what killed the
+     * player" is the single most valuable balancing number this game produces
+     * and reconstructing it from position and timing would be guesswork.
+     */
+    cause: DamageCause;
     /** Damage prevented by armour. */
     absorbed: number;
     x: number;
@@ -135,6 +143,15 @@ export type GameEvents = {
   'player:weightChanged': { weight: number; capacity: number };
   'camera:shake': { intensity: number };
 };
+
+/**
+ * The kinds of harm the game can do to a body.
+ *
+ * Kept coarse on purpose: four categories a designer can act on. "Died to
+ * anomalies 40 % of the time" changes a number in `balance.ts`; "died to
+ * anomaly kind bleach at 14.2 m" changes nothing.
+ */
+export type DamageCause = 'gunfire' | 'explosion' | 'melee' | 'anomaly';
 
 export type RaidOutcomeKind = 'extracted' | 'died' | 'timeout';
 

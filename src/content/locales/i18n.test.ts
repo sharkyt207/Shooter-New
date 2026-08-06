@@ -93,6 +93,8 @@ describe('the English catalogue', () => {
       'Pause',
       'Name',
       'Radar',
+      // Same word in both languages, and no synonym is closer.
+      'Explosion',
     ]);
 
     const accidental = Object.entries(EN)

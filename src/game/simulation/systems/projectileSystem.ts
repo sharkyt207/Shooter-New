@@ -145,6 +145,7 @@ function resolveActorHit(
 
   applyDamage(ctx, target, projectile.owner, ballistic.damage, x, y, {
     zone: ballistic.zone,
+    cause: 'gunfire',
     absorbed: ballistic.absorbed,
     penetrated: ballistic.penetrated,
     fragmented: ballistic.fragmented,
