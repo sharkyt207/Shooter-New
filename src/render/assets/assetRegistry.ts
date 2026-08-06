@@ -10,6 +10,8 @@
  * is a manifest edit, and a missing file is never a crash.
  */
 
+import { resolveAssetSrc } from '@/core/util/assetPath';
+
 import { Assets, Texture } from 'pixi.js';
 import { createLogger } from '@/core/util/logger';
 import { PlaceholderFactory, type PlaceholderSpec } from './placeholderFactory';
@@ -54,14 +56,19 @@ export class AssetRegistry {
    * Failures are logged and degrade to placeholders - never thrown.
    */
   async load(): Promise<void> {
-    try {
-      const response = await fetch(`${this.basePath}manifest.json`, { cache: 'no-cache' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      this.manifest = (await response.json()) as AssetManifest;
-    } catch (error) {
-      log.info('Kein Asset-Manifest gefunden - es werden Platzhalter verwendet.', error);
-      this.manifest = EMPTY_MANIFEST;
-      return;
+    const injected = injectedManifest();
+    if (injected) {
+      this.manifest = injected;
+    } else {
+      try {
+        const response = await fetch(`${this.basePath}manifest.json`, { cache: 'no-cache' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        this.manifest = (await response.json()) as AssetManifest;
+      } catch (error) {
+        log.info('Kein Asset-Manifest gefunden - es werden Platzhalter verwendet.', error);
+        this.manifest = EMPTY_MANIFEST;
+        return;
+      }
     }
 
     const entries = Object.entries(this.manifest.textures ?? {});
@@ -70,7 +77,7 @@ export class AssetRegistry {
     await Promise.all(
       entries.map(async ([key, entry]) => {
         try {
-          const texture = await Assets.load<Texture>(`${this.basePath}${entry.src}`);
+          const texture = await Assets.load<Texture>(resolveAssetSrc(this.basePath, entry.src));
           const spec = PlaceholderFactory.specFor(key);
           this.resolved.set(key, {
             texture,
@@ -129,4 +136,17 @@ export class AssetRegistry {
     this.resolved.clear();
     this.missingKeys.clear();
   }
+}
+
+/**
+ * A manifest handed to the page instead of served next to it.
+ *
+ * A single-file build has no `assets/` directory to fetch from - the images are
+ * `data:` URIs inside the one document. Reading an injected manifest keeps that
+ * build honest to ADR-008: paths still live in exactly one place, and the code
+ * still knows only logical keys.
+ */
+function injectedManifest(): AssetManifest | null {
+  const value = (globalThis as { __ECHO_ASSET_MANIFEST__?: AssetManifest }).__ECHO_ASSET_MANIFEST__;
+  return value && typeof value === 'object' ? value : null;
 }

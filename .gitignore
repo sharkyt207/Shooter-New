@@ -16,3 +16,4 @@ coverage/
 /android/.gradle/
 /android/app/build/
 .smoke/
+dist-single/

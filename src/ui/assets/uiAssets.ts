@@ -11,6 +11,8 @@
  * image rather than a broken one — the menu still works, it just has no mark.
  */
 
+import { resolveAssetSrc } from '@/core/util/assetPath';
+
 const BASE_PATH = 'assets/';
 
 interface ManifestEntry {
@@ -23,8 +25,27 @@ interface Manifest {
 
 let manifest: Manifest = {};
 
+/**
+ * A manifest handed to the page instead of served next to it.
+ *
+ * A single-file build has no `assets/` directory to fetch from - everything,
+ * including the images as `data:` URIs, is in the one document. Reading an
+ * injected manifest keeps that build honest to ADR-008: the code still knows
+ * only logical keys, and the paths still live in exactly one place.
+ */
+function injectedManifest(): Manifest | null {
+  const value = (globalThis as { __ECHO_ASSET_MANIFEST__?: Manifest }).__ECHO_ASSET_MANIFEST__;
+  return value && typeof value === 'object' ? value : null;
+}
+
 /** Load the manifest once at startup. Never throws; a failure means placeholders. */
 export async function loadUiAssets(): Promise<void> {
+  const injected = injectedManifest();
+  if (injected) {
+    manifest = injected;
+    return;
+  }
+
   try {
     const response = await fetch(`${BASE_PATH}manifest.json`, { cache: 'no-cache' });
     if (!response.ok) return;
@@ -38,7 +59,7 @@ export async function loadUiAssets(): Promise<void> {
 /** URL for a logical key, or null when no real asset is registered for it. */
 export function assetUrl(key: string): string | null {
   const entry = manifest.textures?.[key];
-  return entry ? `${BASE_PATH}${entry.src}` : null;
+  return entry ? resolveAssetSrc(BASE_PATH, entry.src) : null;
 }
 
 export function hasAsset(key: string): boolean {
