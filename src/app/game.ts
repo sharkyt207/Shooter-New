@@ -462,6 +462,9 @@ export class Game {
       onMelee: () => {
         this.intent.melee = true;
       },
+      onToggleLight: () => {
+        this.intent.toggleLight = true;
+      },
     });
 
     this.ui.setScreen(null);
@@ -506,6 +509,31 @@ export class Game {
     sim.bus.on('container:opened', () => this.audio.play('container.open'));
     sim.bus.on('weapon:reloadStarted', () => this.audio.play('weapon.reload'));
     sim.bus.on('weapon:dryFire', () => this.audio.play('weapon.dryfire'));
+
+    sim.bus.on('anomaly:entered', () => this.audio.play('anomaly.enter'));
+    sim.bus.on('anomaly:exited', () => this.audio.play('anomaly.exit'));
+    sim.bus.on('anomaly:pulsed', (event) => {
+      this.audio.play('anomaly.pulse', { x: event.x, y: event.y });
+    });
+    sim.bus.on('anomaly:echo', (event) => {
+      this.audio.play('anomaly.echo', { x: event.x, y: event.y });
+    });
+
+    sim.bus.on('door:opened', (event) => {
+      this.audio.play('door.open', { x: event.x, y: event.y });
+      if (event.wasLocked) this.ui.toast('Schloss entriegelt.', 1400);
+    });
+
+    // Only tell the player about a lock once per raid per door - a message that
+    // repeats every tick while standing in a doorway is noise, not information.
+    const reportedLocks = new Set<number>();
+    sim.bus.on('door:locked', (event) => {
+      if (reportedLocks.has(event.entity)) return;
+      reportedLocks.add(event.entity);
+      const key = event.keyItemId ? findItem(event.keyItemId)?.name : null;
+      this.ui.toast(key ? `Verschlossen. Benötigt: ${key}` : 'Verschlossen.', 2200);
+      this.audio.play('door.locked');
+    });
   }
 
   private exitRaid(): void {

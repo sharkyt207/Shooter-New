@@ -44,14 +44,15 @@ Systemreihenfolge pro Tick — **Teil des Determinismus-Vertrags**:
 
 ```
 storePreviousTransforms   (für die Render-Interpolation)
-playerSystem              Bewegung, Ausdauer, Zielen, Feuern, Item-Nutzung
-perceptionSystem          Sicht und Gehör der KI
+playerSystem              Bewegung, Ausdauer, Zielen, Feuern, Item-Nutzung, Licht
+doorSystem                Türen öffnen auf Annäherung, Schlüssel prüfen
+perceptionSystem          Sicht und Gehör der KI (skaliert mit dem Wetter)
 aiSystem                  Verhaltens-FSM und Steering
 updateWeapons             Cooldowns, Nachladen, Streuungsabbau
 projectileSystem          Flug, Kollision, Schaden
 deathSystem               Tod, Loot-Drops, Aufräumen
 interactionSystem         Behälter und Bodenloot
-anomalySystem             Felder, Verlangsamung, Kernschaden
+anomalySystem             alle fünf Felder: Verlangsamung, Puls, Zehrung, Störung, Echo
 extractionSystem          Zonenphasen und Halte-Timer
 updateRaidTimer           Raid-Ende und Warnungen
 flushDestroyed            verzögertes Löschen wird wirksam

@@ -12,6 +12,7 @@
 import type { EntityId } from '@/core/ecs/entity';
 import type { AttachmentLoadout } from '@/content/types';
 import type { FactionId } from '@/content/factions';
+import type { AnomalyKind } from '@/content/anomalies';
 import type { InventoryState } from './inventory/inventory';
 
 export interface Transform {
@@ -65,6 +66,11 @@ export interface PlayerTag {
   /** Accumulated experience earned during this raid. */
   raidXp: number;
   kills: number;
+  /**
+   * Flashlight. Lets the player see in the dark and lets everyone else see the
+   * player - which is the entire decision the night side of a fragment poses.
+   */
+  lightOn: boolean;
 }
 
 export interface Stamina {
@@ -167,6 +173,12 @@ export interface ContainerState {
   searched: boolean;
   /** Rolled contents, revealed when the search completes. */
   contents: Array<{ itemId: string; quantity: number }>;
+  /**
+   * Contents this container holds no matter what the loot roll says.
+   * Keycards live here: a key that depends on a roll is a vault that sometimes
+   * cannot be opened.
+   */
+  guaranteed: Array<{ itemId: string; quantity: number }>;
 }
 
 export type ExtractionPhase = 'locked' | 'available' | 'closing' | 'closed' | 'used';
@@ -183,13 +195,44 @@ export interface ExtractionZone {
   holdProgress: number;
 }
 
-export type AnomalyKind = 'stillness';
+export type { AnomalyKind };
+
+/** One recorded passer-by, kept by an Echo-Schatten so it can replay them. */
+export interface EchoSample {
+  x: number;
+  y: number;
+  tick: number;
+}
 
 export interface Anomaly {
   kind: AnomalyKind;
   radius: number;
   /** Drives the visual pulse; advanced by the simulation so it stays deterministic. */
   phase: number;
+  /** Seconds since the last discrete event - a Rückstoß pulse, for instance. */
+  timer: number;
+  /** Echo-Schatten memory. Empty for every other kind. */
+  samples: EchoSample[];
+  /** Seconds since the last echo replay. */
+  replayTimer: number;
+}
+
+export type DoorState = 'closed' | 'open' | 'locked';
+
+/**
+ * A door in a stamped room prefab.
+ *
+ * The grid cell is the authority on whether the doorway blocks anything; this
+ * component carries the reason, the key and the identity the renderer needs.
+ */
+export interface Door {
+  cx: number;
+  cy: number;
+  state: DoorState;
+  /** Item that unlocks this door. Null for an ordinary one. */
+  keyItemId: string | null;
+  /** True once anything has passed through - the renderer keeps it swung open. */
+  everOpened: boolean;
 }
 
 /**

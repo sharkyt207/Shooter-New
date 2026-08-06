@@ -178,3 +178,48 @@ Entwicklungsabhängigkeiten: `vite`, `typescript`, `vitest`.
 
 **Begründung:** Jede Abhängigkeit ist ein zukünftiges Migrations- und Sicherheitsrisiko und
 kostet Bundle-Größe (= Ladezeit auf Mobilnetz). Kleine Helfer schreiben wir selbst.
+
+---
+
+## ADR-013 — Türzustand liegt im Kollisionsgitter, nicht in der Komponente
+
+**Status:** akzeptiert (M4)
+
+**Kontext.** Mit den Raum-Prefabs bekommt die Karte Türen. Eine Tür beeinflusst
+vier Systeme, die alle dieselbe Frage stellen: Kollision („komme ich durch?“),
+Sichtlinie („sehe ich hindurch?“), Projektile („fliegt die Kugel durch?“) und
+Wegfindung („darf ich hier langlaufen?“). Naheliegend wäre eine `Door`-Komponente,
+die jedes dieser Systeme zusätzlich abfragt.
+
+**Entscheidung.** Der Zustand liegt im `MapGrid`: Die Zelle ist `CELL_DOOR`, ein
+paralleles `doorOf`-Array hält `DOOR_OPEN | DOOR_CLOSED | DOOR_LOCKED`. Die
+`Door`-Entity trägt nur noch, *warum* die Tür zu ist — Schlüssel, Sprite,
+Identität.
+
+Daraus folgen drei Abfragen mit klar getrennter Bedeutung:
+
+| Methode | Frage | Geschlossene Tür | Verschlossene Tür |
+|---------|-------|------------------|-------------------|
+| `isWall` | reine Geometrie (Renderer) | nein | nein |
+| `isBlocking` | Bewegung, Sicht, Projektile | **ja** | **ja** |
+| `isNavBlocked` | Wegfindung | nein | **ja** |
+
+**Begründung.**
+
+1. **Kein Sonderfall an vier Stellen.** Alle vier Systeme fragen weiterhin genau
+   eine O(1)-Gitterabfrage. Es gibt keine Möglichkeit, dass eines von ihnen die
+   Tür „vergisst“.
+2. **Wegfindung darf anders antworten als Kollision.** Eine geschlossene, aber
+   unverschlossene Tür blockiert die Bewegung und *nicht* die Route — wer
+   ankommt, öffnet sie. Eine verschlossene blockiert auch die Route, denn Gegner
+   tragen nie Schlüssel und würden sich sonst am Rahmen festfahren. Mit einer
+   Komponente wäre diese Unterscheidung über vier Systeme verstreut.
+3. **Cache-Invalidierung wird trivial.** `grid.version` steigt bei jeder
+   Türänderung; der `NavigationCache` verwirft daraufhin veraltete Flow-Fields.
+   Eine Tür, die aufgeht, verändert das Gebäude — und die KI weiß es sofort.
+
+**Konsequenzen.** `MapGrid.set()` muss `doorOf` mitlöschen, sonst entsteht
+Boden, der weiterhin blockiert (genau dieser Fehler ist in M4 aufgetreten und
+hat einen Test bekommen). Der Erreichbarkeits-Flood-Fill läuft bewusst **durch**
+verschlossene Türen, weil der Generator garantiert, dass jeder Schlüssel
+außerhalb des Raums liegt, den er öffnet.

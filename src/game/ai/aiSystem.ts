@@ -33,6 +33,7 @@ import { assignRoles, flankPosition, hasFreshIntel, type Squad } from './squad';
 const scratchIds: EntityId[] = [];
 const scratchDir = { x: 0, y: 0 };
 const scratchFlank = { x: 0, y: 0 };
+const scratchCover = { x: 0, y: 0 };
 
 /** Per-archetype stat scaling for the current phase. */
 interface PhaseModifiers {
@@ -296,6 +297,12 @@ function updateChase(
   if (role === 'flank' && squad) {
     const flank = flankPosition(squad, transform.x, transform.y, scratchFlank);
     navigateTo(ctx, entity, transform, flank.x, flank.y, speed);
+  } else if (role === 'suppress' && findCover(ctx, transform, targetTransform, scratchCover)) {
+    // A suppressor makes for the nearest authored cover post that still looks
+    // at the target. This is what the room prefabs bought: the AI now fights
+    // from positions a designer chose, instead of from wherever it happened to
+    // be standing when it saw someone.
+    navigateTo(ctx, entity, transform, scratchCover.x, scratchCover.y, speed);
   } else {
     const destX = canSee ? targetTransform.x : agent.lastKnownX;
     const destY = canSee ? targetTransform.y : agent.lastKnownY;
@@ -354,10 +361,14 @@ function updateAttack(
     AI.turnRateDeg * DEG_TO_RAD * ctx.dt,
   );
 
+  // A suppressor standing on a cover post stays on it. Shuffling out of cover
+  // to maintain a preferred distance would undo the entire point of having it.
+  const holdingCover = role === 'suppress' && isAtCover(ctx, transform);
+
   // Hold the preferred distance, then spread out from squad mates so a group
   // does not collapse into one target-shaped clump.
-  const tooClose = dist < engageRange * 0.55;
-  const tooFar = dist > engageRange;
+  const tooClose = !holdingCover && dist < engageRange * 0.55;
+  const tooFar = !holdingCover && dist > engageRange;
   let moveX = 0;
   let moveY = 0;
   if (tooClose || tooFar) {
@@ -479,6 +490,64 @@ function tryThrowGrenade(
   // Drop the temporary carrier again so reloading keeps using the AI path.
   if (!carrier) ctx.world.carriers.remove(entity);
   return thrown;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cover
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The best authored cover post near this enemy, written into `out`.
+ *
+ * "Best" means: close to the enemy, and with a line to the target - a cover
+ * post the enemy cannot shoot from is just a corner to hide in, which reads as
+ * cowardice rather than as tactics. Returns false when nothing qualifies, in
+ * which case the caller falls back to walking at the target.
+ */
+function findCover(
+  ctx: SimContext,
+  from: { x: number; y: number },
+  target: { x: number; y: number },
+  out: { x: number; y: number },
+): boolean {
+  const points = ctx.coverPoints;
+  if (points.length === 0) return false;
+
+  const maxDistSq = AI.coverSearchRadius * AI.coverSearchRadius;
+  let bestScore = Infinity;
+  let found = false;
+
+  for (const point of points) {
+    const dx = point.x - from.x;
+    const dy = point.y - from.y;
+    const distSq = dx * dx + dy * dy;
+    if (distSq > maxDistSq) continue;
+
+    // Prefer cover that is closer to the target than the enemy currently is:
+    // holding a position behind the fight is not suppression.
+    const toTargetSq = (point.x - target.x) ** 2 + (point.y - target.y) ** 2;
+    const score = distSq + toTargetSq * 0.35;
+    if (score >= bestScore) continue;
+    if (!ctx.grid.hasLineOfSight(point.x, point.y, target.x, target.y)) continue;
+
+    bestScore = score;
+    out.x = point.x;
+    out.y = point.y;
+    found = true;
+  }
+
+  return found;
+}
+
+/** Is this enemy standing on a cover post right now? */
+function isAtCover(ctx: SimContext, transform: { x: number; y: number }): boolean {
+  const radiusSq = AI.coverHoldRadius * AI.coverHoldRadius;
+  for (const point of ctx.coverPoints) {
+    const dx = point.x - transform.x;
+    const dy = point.y - transform.y;
+    if (dx * dx + dy * dy <= radiusSq) return true;
+  }
+  return false;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

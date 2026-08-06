@@ -12,6 +12,14 @@ export const CELL_OPEN = 0;
 export const CELL_WALL = 1;
 /** Marks a seam corridor. Walkable, but visually and audibly distinct. */
 export const CELL_SEAM = 2;
+/** A doorway. Passable only while the door in it is open (see `doorOf`). */
+export const CELL_DOOR = 3;
+
+/** Per-cell door state, parallel to `cells`. */
+export const DOOR_NONE = 0;
+export const DOOR_OPEN = 1;
+export const DOOR_CLOSED = 2;
+export const DOOR_LOCKED = 3;
 
 export interface MapCellInfo {
   /** Index of the fragment this cell belongs to, or -1 for seams and voids. */
@@ -22,6 +30,14 @@ export class MapGrid {
   readonly cells: Uint8Array;
   /** Fragment index per cell; -1 where none applies. */
   readonly fragmentOf: Int8Array;
+  /** Door state per cell: DOOR_NONE for everything that is not a doorway. */
+  readonly doorOf: Uint8Array;
+
+  /**
+   * Bumped whenever the walkable topology changes - which today means a door
+   * opening. Cached flow fields compare against it and rebuild when it moves.
+   */
+  version = 0;
 
   constructor(
     readonly width: number,
@@ -30,6 +46,7 @@ export class MapGrid {
   ) {
     this.cells = new Uint8Array(width * height).fill(CELL_WALL);
     this.fragmentOf = new Int8Array(width * height).fill(-1);
+    this.doorOf = new Uint8Array(width * height).fill(DOOR_NONE);
   }
 
   get worldWidth(): number {
@@ -53,19 +70,83 @@ export class MapGrid {
     return this.cells[cy * this.width + cx] as number;
   }
 
+  /**
+   * Write a plain cell. Any door that stood here is removed with it - leaving
+   * `doorOf` behind would produce a floor tile that silently blocks everything.
+   */
   set(cx: number, cy: number, value: number, fragmentIndex = -1): void {
     if (!this.inBounds(cx, cy)) return;
     const i = cy * this.width + cx;
     this.cells[i] = value;
     this.fragmentOf[i] = fragmentIndex;
+    if (this.doorOf[i] !== DOOR_NONE) {
+      this.doorOf[i] = DOOR_NONE;
+      this.version++;
+    }
   }
 
+  /** Solid geometry. A doorway is never a wall, whatever its door is doing. */
   isWall(cx: number, cy: number): boolean {
     return this.get(cx, cy) === CELL_WALL;
   }
 
+  /**
+   * Does this cell stop movement, sight and bullets right now?
+   *
+   * This - not `isWall` - is the question collision, line of sight and
+   * projectiles ask, because a closed door stops all three without being a wall.
+   */
+  isBlocking(cx: number, cy: number): boolean {
+    if (!this.inBounds(cx, cy)) return true;
+    const i = cy * this.width + cx;
+    if (this.cells[i] === CELL_WALL) return true;
+    const door = this.doorOf[i] as number;
+    return door === DOOR_CLOSED || door === DOOR_LOCKED;
+  }
+
   isOpen(cx: number, cy: number): boolean {
-    return this.get(cx, cy) !== CELL_WALL;
+    return !this.isBlocking(cx, cy);
+  }
+
+  /**
+   * Blocking for pathfinding purposes.
+   *
+   * A closed but unlocked door is *not* blocking here: anyone who reaches it
+   * opens it. A locked one is, because only the player can ever hold a key, so
+   * routing the AI through it would strand it against the frame.
+   */
+  isNavBlocked(cx: number, cy: number): boolean {
+    if (!this.inBounds(cx, cy)) return true;
+    const i = cy * this.width + cx;
+    return this.cells[i] === CELL_WALL || this.doorOf[i] === DOOR_LOCKED;
+  }
+
+  isDoor(cx: number, cy: number): boolean {
+    return this.get(cx, cy) === CELL_DOOR;
+  }
+
+  doorAt(cx: number, cy: number): number {
+    if (!this.inBounds(cx, cy)) return DOOR_NONE;
+    return this.doorOf[cy * this.width + cx] as number;
+  }
+
+  /** Place a doorway. Marks the cell and records the door's initial state. */
+  setDoor(cx: number, cy: number, state: number, fragmentIndex = -1): void {
+    if (!this.inBounds(cx, cy)) return;
+    const i = cy * this.width + cx;
+    this.cells[i] = CELL_DOOR;
+    this.fragmentOf[i] = fragmentIndex;
+    this.doorOf[i] = state;
+    this.version++;
+  }
+
+  /** Open or close an existing door, invalidating cached navigation. */
+  setDoorState(cx: number, cy: number, state: number): void {
+    if (!this.inBounds(cx, cy)) return;
+    const i = cy * this.width + cx;
+    if (this.cells[i] !== CELL_DOOR || this.doorOf[i] === state) return;
+    this.doorOf[i] = state;
+    this.version++;
   }
 
   fragmentAt(cx: number, cy: number): number {
@@ -92,8 +173,9 @@ export class MapGrid {
     return (cy + 0.5) * this.cellSize;
   }
 
+  /** "Would an actor be stuck here?" - walls and closed doors alike. */
   isWallAtWorld(x: number, y: number): boolean {
-    return this.isWall(this.worldToCellX(x), this.worldToCellY(y));
+    return this.isBlocking(this.worldToCellX(x), this.worldToCellY(y));
   }
 
   /** AABB of a wall cell, in world metres. Reuses `out` to stay allocation-free. */
@@ -116,7 +198,7 @@ export class MapGrid {
     const endX = this.worldToCellX(x1);
     const endY = this.worldToCellY(y1);
 
-    if (this.isWall(cx, cy)) return false;
+    if (this.isBlocking(cx, cy)) return false;
     if (cx === endX && cy === endY) return true;
 
     const dx = x1 - x0;
@@ -148,7 +230,7 @@ export class MapGrid {
 
       // Wall check comes first: a target standing inside geometry is not
       // visible, and neither is anything behind it.
-      if (this.isWall(cx, cy)) return false;
+      if (this.isBlocking(cx, cy)) return false;
       if (cx === endX && cy === endY) return true;
       if (tMaxX > 1 && tMaxY > 1) return true;
     }
@@ -191,18 +273,22 @@ export class MapGrid {
         tMaxY += tDeltaY;
       }
 
-      if (this.isWall(cx, cy)) walls++;
+      if (this.isBlocking(cx, cy)) walls++;
       if (cx === endX && cy === endY) break;
       if (tMaxX > 1 && tMaxY > 1) break;
     }
     return walls;
   }
 
-  /** Every open cell index. Used by the spawner to place things. */
+  /**
+   * Every cell something may be spawned on.
+   * Doorways are excluded: a container standing in a door is a blocked door.
+   */
   collectOpenCells(out: number[] = []): number[] {
     out.length = 0;
     for (let i = 0; i < this.cells.length; i++) {
-      if (this.cells[i] !== CELL_WALL) out.push(i);
+      const cell = this.cells[i];
+      if (cell !== CELL_WALL && cell !== CELL_DOOR) out.push(i);
     }
     return out;
   }
@@ -218,6 +304,11 @@ export class MapGrid {
   /**
    * Flood fill from a starting cell; every reachable open cell is marked.
    * The generator uses this to guarantee a connected, fully playable map.
+   *
+   * Doors count as passable regardless of their lock, because the generator
+   * guarantees every key spawns outside the room it opens. Treating a locked
+   * door as a wall here would have the connectivity pass seal a vault it was
+   * supposed to protect.
    */
   floodFill(startIndex: number): Uint8Array {
     const visited = new Uint8Array(this.cells.length);

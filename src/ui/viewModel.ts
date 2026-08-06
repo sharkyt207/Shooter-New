@@ -81,6 +81,17 @@ export interface HudViewModel {
   /** Live boss, once it has engaged. Null the rest of the time. */
   boss: { name: string; health: number; maxHealth: number; phase: string } | null;
 
+  /**
+   * A Flüstern has the instruments down: minimap, ammo readout and extraction
+   * markers are unreliable and the HUD says so rather than lying.
+   */
+  hudJammed: boolean;
+  /** Flashlight state, for the HUD toggle. */
+  lightOn: boolean;
+  /** Weather name and id, so the HUD can label the conditions. */
+  weatherName: string;
+  weatherId: string;
+
   zones: HudZone[];
   inventory: HudItem[];
   /** Consumables, surfaced as quick-use buttons in the HUD. */
@@ -120,6 +131,10 @@ const EMPTY: HudViewModel = {
   playerY: 0,
   playerRotation: 0,
   boss: null,
+  hudJammed: false,
+  lightOn: false,
+  weatherName: '-',
+  weatherId: 'clear',
   zones: [],
   inventory: [],
   consumables: [],
@@ -208,7 +223,11 @@ export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
     playerRotation: transform?.rotation ?? 0,
 
     boss: findEngagedBoss(sim),
-    zones,
+    hudJammed: sim.hudJammed,
+    lightOn: sim.world.players.get(player)?.lightOn ?? false,
+    weatherName: sim.weather.name,
+    weatherId: sim.weather.id,
+    zones: sim.hudJammed ? [] : zones,
     inventory: inventory ? toHudItems(inventory.slots) : [],
     consumables: inventory
       ? toHudItems(inventory.slots).filter((item) => item.category === 'medical')

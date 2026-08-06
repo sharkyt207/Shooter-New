@@ -7,7 +7,8 @@
  * quite, an enemy.
  */
 
-import { COMBAT, PLAYER } from '@/content/balance';
+import { COMBAT, LIGHT, PLAYER } from '@/content/balance';
+import { getAnomaly } from '@/content/anomalies';
 import { getContainer, type ContainerId } from '@/content/biomes';
 import { findEnemy } from '@/content/enemies';
 import { findItem } from '@/content/items';
@@ -19,7 +20,7 @@ import { addItem, createInventory } from '@/game/inventory/inventory';
 import type { Loadout } from '@/game/player/loadout';
 import { loadoutCapacityKg } from '@/game/player/loadout';
 import { resolveWeapon } from '@/game/weapons/weaponStats';
-import type { ExtractionSpawn } from '@/game/map/mapGenerator';
+import type { ContainerSpawn, DoorSpawn, ExtractionSpawn } from '@/game/map/mapGenerator';
 import type { RaidWorld } from './raidWorld';
 
 export function createPlayer(
@@ -27,6 +28,7 @@ export function createPlayer(
   loadout: Readonly<Loadout>,
   x: number,
   y: number,
+  ambientLight = 1,
 ): EntityId {
   const entity = world.createEntity();
 
@@ -41,7 +43,14 @@ export function createPlayer(
   });
   world.staminas.set(entity, { current: PLAYER.maxStamina, max: PLAYER.maxStamina, regenDelay: 0 });
   world.factions.set(entity, { id: 'player' });
-  world.players.set(entity, { raidXp: 0, kills: 0 });
+  // The lamp starts on when the fragment is dark enough to need it - having to
+  // find the button before being able to see anything is not a decision, it is
+  // an obstacle.
+  world.players.set(entity, {
+    raidXp: 0,
+    kills: 0,
+    lightOn: ambientLight < LIGHT.darkThreshold,
+  });
   world.renderables.set(entity, { assetKey: 'actor.player', height: 1.8, tint: 0xffffff });
 
   const armorDef = loadout.armorItemId ? findItem(loadout.armorItemId) : undefined;
@@ -247,27 +256,61 @@ export function createLootDrop(
   return entity;
 }
 
-export function createContainer(
-  world: RaidWorld,
-  containerId: string,
-  x: number,
-  y: number,
-): EntityId | null {
-  const def = getContainer(containerId as ContainerId);
+export function createContainer(world: RaidWorld, spawn: ContainerSpawn): EntityId | null {
+  const def = getContainer(spawn.containerId as ContainerId);
   if (!def) return null;
 
   const entity = world.createEntity();
-  world.transforms.set(entity, { x, y, rotation: 0, prevX: x, prevY: y, prevRotation: 0 });
+  world.transforms.set(entity, {
+    x: spawn.x,
+    y: spawn.y,
+    rotation: 0,
+    prevX: spawn.x,
+    prevY: spawn.y,
+    prevRotation: 0,
+  });
   world.colliders.set(entity, { radius: 0.55, isStatic: true });
   world.containers.set(entity, {
-    containerId,
+    containerId: spawn.containerId,
     searchProgress: 0,
     searched: false,
     // Contents are rolled lazily on first search, so a raid only pays for the
     // loot the player actually reaches.
     contents: [],
+    guaranteed: spawn.guaranteed ? spawn.guaranteed.map((entry) => ({ ...entry })) : [],
   });
   world.renderables.set(entity, { assetKey: def.visual, height: 0.8, tint: 0xffffff });
+  return entity;
+}
+
+/**
+ * A door standing in a doorway cell.
+ *
+ * The grid cell is the authority on whether it blocks anything; this entity
+ * carries the lock, the key and the sprite.
+ */
+export function createDoor(world: RaidWorld, spawn: DoorSpawn): EntityId {
+  const entity = world.createEntity();
+  world.transforms.set(entity, {
+    x: spawn.x,
+    y: spawn.y,
+    rotation: 0,
+    prevX: spawn.x,
+    prevY: spawn.y,
+    prevRotation: 0,
+  });
+  world.doors.set(entity, {
+    cx: spawn.cx,
+    cy: spawn.cy,
+    state: spawn.locked ? 'locked' : 'closed',
+    keyItemId: spawn.keyItemId,
+    everOpened: false,
+  });
+  world.renderables.set(entity, {
+    assetKey: spawn.locked ? 'prop.door.locked' : 'prop.door',
+    height: 2.1,
+    tint: 0xffffff,
+  });
   return entity;
 }
 
@@ -300,9 +343,26 @@ export function createAnomaly(
   y: number,
   radius: number,
 ): EntityId {
+  const def = getAnomaly(kind);
   const entity = world.createEntity();
+
   world.transforms.set(entity, { x, y, rotation: 0, prevX: x, prevY: y, prevRotation: 0 });
-  world.anomalies.set(entity, { kind, radius, phase: 0 });
-  world.renderables.set(entity, { assetKey: 'fx.anomaly.core', height: 0.1, tint: 0x38e1d4 });
+  world.anomalies.set(entity, {
+    kind,
+    radius,
+    phase: 0,
+    // Stagger the first Rückstoß pulse by kind so two anomalies of the same
+    // type never breathe in lockstep.
+    timer: 0,
+    samples: [],
+    replayTimer: 0,
+  });
+  // Colour comes from the definition, never from the renderer: the player has
+  // to be able to tell a Bleiche from a Stillstand at a glance (ADR-008).
+  world.renderables.set(entity, {
+    assetKey: `fx.anomaly.${kind}`,
+    height: 0.1,
+    tint: def.color,
+  });
   return entity;
 }

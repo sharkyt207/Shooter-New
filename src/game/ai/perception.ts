@@ -15,7 +15,7 @@
  * enemy re-evaluates roughly every `perceptionIntervalSeconds`, not every tick.
  */
 
-import { AI } from '@/content/balance';
+import { AI, LIGHT } from '@/content/balance';
 import { findEnemy } from '@/content/enemies';
 import { isHostile, playerThreatBias } from '@/content/factions';
 import type { EntityId } from '@/core/ecs/entity';
@@ -120,6 +120,9 @@ function findVisibleTarget(
 ): EntityId | null {
   const halfCone = def.perception.visionConeDeg * 0.5 * DEG_TO_RAD;
   const bias = playerThreatBias(selfFaction as never);
+  // Weather scales sight for everyone equally. Fog is not a handicap, it is a
+  // different raid: it hides the player exactly as well as it hides the enemy.
+  const baseRange = def.perception.visionRange * ctx.weather.visionMultiplier;
 
   let best: EntityId | null = null;
   let bestScore = Infinity;
@@ -134,9 +137,11 @@ function findVisibleTarget(
     const other = ctx.world.transforms.get(candidate);
     if (!other) continue;
 
+    const range = baseRange * lightPenalty(ctx, candidate);
+
     scratchPoint.x = other.x;
     scratchPoint.y = other.y;
-    if (!isInCone(transform.x, transform.y, transform.rotation, halfCone, def.perception.visionRange, scratchPoint)) {
+    if (!isInCone(transform.x, transform.y, transform.rotation, halfCone, range, scratchPoint)) {
       continue;
     }
     if (!ctx.grid.hasLineOfSight(transform.x, transform.y, other.x, other.y)) continue;
@@ -150,6 +155,18 @@ function findVisibleTarget(
   }
 
   return best;
+}
+
+/**
+ * How much further this candidate can be seen because of the lamp it carries.
+ *
+ * This is the entire trade the night side of a fragment is built on: a player
+ * who lights the room can see it, and so can everyone in it. Turning the lamp
+ * off is always available and always costs something.
+ */
+function lightPenalty(ctx: SimContext, candidate: EntityId): number {
+  if (ctx.weather.lightMultiplier >= LIGHT.darkThreshold) return 1;
+  return ctx.world.players.get(candidate)?.lightOn ? LIGHT.spottedRangeBonus : 1;
 }
 
 /**
@@ -210,8 +227,10 @@ export function audibleRadius(
   toX: number,
   toY: number,
 ): number {
+  // Weather first: a storm swallows sound, fog carries it.
+  const radius = emittedRadius * ctx.weather.hearingMultiplier;
   const walls = ctx.grid.countWallsBetween(fromX, fromY, toX, toY);
-  if (walls === 0) return emittedRadius;
+  if (walls === 0) return radius;
   if (walls > AI.maxWallsHeard) return 0;
-  return emittedRadius * Math.pow(AI.wallSoundDamping, walls);
+  return radius * Math.pow(AI.wallSoundDamping, walls);
 }

@@ -8,6 +8,7 @@
  * broke (ADR-009).
  */
 
+import { getAnomaly, type AnomalyKind } from '@/content/anomalies';
 import { RAID } from '@/content/balance';
 import { formatClock } from '@/core/time/fixedClock';
 import { seedSignature } from '@/core/math/random';
@@ -27,6 +28,8 @@ export function createBriefingScreen(
   callbacks: BriefingCallbacks,
 ): Screen {
   const threat = describeThreat(map.enemies.length);
+  const lockedDoors = map.doors.filter((door) => door.locked).length;
+  const anomalyKinds = [...new Set(map.anomalies.map((anomaly) => anomaly.kind))] as AnomalyKind[];
 
   const root = el('div', {
     className: 'screen',
@@ -70,8 +73,13 @@ export function createBriefingScreen(
         children: [
           el('div', { className: 'panel__title', text: 'Lagebild' }),
           statRow('Bedrohung', threat),
+          statRow('Wetter', map.weather.name),
           statRow('Behälter erfasst', String(map.containers.length)),
           statRow('Anomalien', map.anomalies.length > 0 ? `${map.anomalies.length} aktiv` : 'keine'),
+          statRow(
+            'Verschlossen',
+            lockedDoors > 0 ? `${lockedDoors} Kammer${lockedDoors > 1 ? 'n' : ''}` : 'keine',
+          ),
           statRow('Ausgänge', String(map.extractions.length)),
           statRow('Dauer', formatClock(RAID.durationSeconds)),
           statRow(
@@ -81,16 +89,36 @@ export function createBriefingScreen(
         ],
       }),
 
-      map.anomalies.length > 0
+      el('div', {
+        className: 'panel',
+        children: [
+          el('div', { className: 'panel__title', text: 'Bedingungen' }),
+          el('div', { className: 'muted', text: map.weather.briefing }),
+        ],
+      }),
+
+      // Name the anomalies that are actually out there. A generic warning
+      // teaches nothing; "there is a Bleiche in this rift" changes how the
+      // player packs and how they move.
+      anomalyKinds.length > 0
         ? el('div', {
             className: 'panel',
             style: { borderColor: 'var(--color-echo)' },
             children: [
               el('div', { className: 'panel__title', text: 'Warnung' }),
-              el('div', {
-                className: 'muted',
-                text: 'Echo-Aktivität gemessen. Innerhalb der Felder verlangsamt sich alles — auch Geschosse. Der Kern ist tödlich.',
-              }),
+              ...anomalyKinds.map((kind) =>
+                el('div', {
+                  className: 'row',
+                  style: { gap: 'var(--space-3)', padding: 'var(--space-1) 0' },
+                  children: [
+                    el('span', {
+                      style: { color: colorToCss(getAnomaly(kind).color), fontWeight: '600' },
+                      text: getAnomaly(kind).name,
+                    }),
+                    el('span', { className: 'muted grow', text: getAnomaly(kind).description }),
+                  ],
+                }),
+              ),
             ],
           })
         : null,
@@ -124,4 +152,9 @@ function describeThreat(enemyCount: number): string {
   if (enemyCount <= 12) return 'mittel';
   if (enemyCount <= 20) return 'hoch';
   return 'extrem';
+}
+
+/** 0xRRGGBB to a CSS colour. The palette lives in content, not in the stylesheet. */
+function colorToCss(color: number): string {
+  return `#${color.toString(16).padStart(6, '0')}`;
 }

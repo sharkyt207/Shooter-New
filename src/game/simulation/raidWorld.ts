@@ -16,6 +16,7 @@ import type {
   Collider,
   ContainerState,
   Disoriented,
+  Door,
   Equipment,
   Faction,
   Health,
@@ -48,6 +49,7 @@ export class RaidWorld extends World {
   readonly agents: ComponentStore<EnemyAgent>;
   readonly lootDrops: ComponentStore<LootDrop>;
   readonly containers: ComponentStore<ContainerState>;
+  readonly doors: ComponentStore<Door>;
   readonly extractionZones: ComponentStore<ExtractionZone>;
   readonly anomalies: ComponentStore<Anomaly>;
   readonly renderables: ComponentStore<Renderable>;
@@ -76,6 +78,7 @@ export class RaidWorld extends World {
     this.agents = this.registerStore<EnemyAgent>('agent');
     this.lootDrops = this.registerStore<LootDrop>('lootDrop');
     this.containers = this.registerStore<ContainerState>('container');
+    this.doors = this.registerStore<Door>('door');
     this.extractionZones = this.registerStore<ExtractionZone>('extractionZone');
     this.anomalies = this.registerStore<Anomaly>('anomaly');
     this.renderables = this.registerStore<Renderable>('renderable');

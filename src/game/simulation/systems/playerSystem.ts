@@ -136,6 +136,10 @@ export function playerSystem(ctx: SimContext): void {
     }
   }
 
+  // ── Flashlight ───────────────────────────────────────────────────────────
+  const tag = world.players.get(entity);
+  if (tag && intent.toggleLight) tag.lightOn = !tag.lightOn;
+
   if (!busy && intent.melee && ctx.meleeCooldown <= 0) {
     if (meleeAttack(ctx, entity)) ctx.meleeCooldown = MELEE.cooldownSeconds;
   }

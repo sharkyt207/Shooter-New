@@ -11,6 +11,7 @@
  */
 
 import { Graphics, type Renderer, type Texture } from 'pixi.js';
+import { findAnomaly } from '@/content/anomalies';
 
 /** The palette from the art direction document, as numbers for Pixi. */
 export const PALETTE = {
@@ -61,6 +62,9 @@ const PROP_COLORS: Record<string, number> = {
   'prop.locker': 0x4a5568,
   'prop.medcase': 0xb8535f,
   'prop.echo_cache': PALETTE.echo,
+  'prop.door': 0x6b7385,
+  'prop.door.locked': PALETTE.threat,
+  'prop.door.open': 0x3a4252,
 };
 
 /**
@@ -160,6 +164,8 @@ export class PlaceholderFactory {
 
   /** Props: an isometric box with a lit top face and two shaded sides. */
   private buildProp(key: string): Texture {
+    if (key.startsWith('prop.door')) return this.buildDoor(key);
+
     const color = PROP_COLORS[key] ?? PALETTE.concrete;
     const g = new Graphics();
 
@@ -177,6 +183,47 @@ export class PlaceholderFactory {
 
     g.moveTo(32, 8).lineTo(58, 22).lineTo(32, 36).lineTo(6, 22).closePath();
     g.stroke({ width: 1.5, color: PALETTE.bone, alpha: 0.35 });
+
+    return this.toTexture(g);
+  }
+
+  /**
+   * Doors: a standing slab, not a box.
+   *
+   * The three states have to be distinguishable across the room, because the
+   * whole point of a locked door is that the player recognises it as a promise
+   * before walking all the way over to it: grey is shut, amber is locked, and
+   * an open door is a dark frame with the leaf swung aside.
+   */
+  private buildDoor(key: string): Texture {
+    const color = PROP_COLORS[key] ?? PALETTE.concrete;
+    const g = new Graphics();
+    const open = key.endsWith('.open');
+
+    g.ellipse(32, 54, 20, 7).fill({ color: 0x000000, alpha: 0.3 });
+
+    // Frame, always drawn - an opened door still reads as a doorway.
+    g.moveTo(10, 46).lineTo(10, 12).lineTo(54, 12).lineTo(54, 46);
+    g.stroke({ width: 3, color: darken(color, 0.35), alpha: 0.9 });
+
+    if (open) {
+      // Leaf swung aside, plus the dark opening it left behind.
+      g.rect(14, 14, 36, 32).fill({ color: PALETTE.void, alpha: 0.75 });
+      g.moveTo(50, 14).lineTo(58, 20).lineTo(58, 44).lineTo(50, 44).closePath();
+      g.fill({ color: darken(color, 0.15) });
+      return this.toTexture(g);
+    }
+
+    g.rect(13, 13, 38, 34).fill({ color });
+    g.rect(13, 13, 38, 34).stroke({ width: 2, color: lighten(color, 0.25), alpha: 0.8 });
+    // Handle side, so the leaf has a direction rather than being a rectangle.
+    g.rect(44, 26, 4, 8).fill({ color: lighten(color, 0.45) });
+
+    if (key.endsWith('.locked')) {
+      // A hard, bright bar across the middle: readable at any zoom level.
+      g.rect(17, 27, 30, 6).fill({ color: PALETTE.threat });
+      g.rect(17, 27, 30, 6).stroke({ width: 1, color: PALETTE.void, alpha: 0.6 });
+    }
 
     return this.toTexture(g);
   }
@@ -278,16 +325,70 @@ export class PlaceholderFactory {
    * Drawn over the world and centred on the player, it produces the limited
    * visibility that carries the game's tension (Pillar P3).
    */
-  buildDarkness(radiusPx: number, color: number): Texture {
+  buildDarkness(radiusPx: number, color: number, intensity = 1): Texture {
     const g = new Graphics();
     const steps = 24;
+    // At night the clear core shrinks and the falloff bites harder, so the
+    // world closes in around the player instead of merely getting greyer.
+    const core = 0.25 / intensity;
 
     for (let i = steps; i >= 1; i--) {
       const t = i / steps;
       const radius = radiusPx * t;
       // Alpha rises with distance and stays fully transparent near the centre.
-      const alpha = Math.pow(Math.max(0, (t - 0.25) / 0.75), 1.6) * 0.055;
+      const alpha = Math.pow(Math.max(0, (t - core) / (1 - core)), 1.6) * 0.055 * intensity;
       g.circle(radiusPx, radiusPx, radius).fill({ color, alpha });
+    }
+
+    return this.toTexture(g);
+  }
+
+  /**
+   * The flashlight cone, drawn once and rotated by the renderer.
+   *
+   * Bright at the mouth, fading to nothing at the end of its reach, with a soft
+   * spill at the character's feet so the player is never standing in a hole.
+   * Additive when composited, which is why it is drawn in flat white here and
+   * tinted at use.
+   */
+  buildLightCone(rangeMetres: number, coneDeg: number, color: number): Texture {
+    const range = rangeMetres * PX_PER_METRE;
+    // Drawn as a true circular sector around the texture centre, pointing +X.
+    // The isometric squash is *not* baked in: the renderer applies it with a
+    // container scale outside the sprite's rotation, which is the only order
+    // that maps a world-space cone onto the 2:1 projection correctly.
+    const size = range * 2;
+    const origin = range;
+    const half = (coneDeg * 0.5 * Math.PI) / 180;
+    const g = new Graphics();
+
+    // `generateTexture` crops to the drawn geometry, and a sector's bounding
+    // box is nowhere near centred on its apex - so an anchor of 0.5 would put
+    // the light source somewhere off to the side of the character holding it.
+    // A transparent full-size square forces symmetric bounds around the apex.
+    g.rect(0, 0, size, size).fill({ color, alpha: 0.0001 });
+
+    // Two nested loops: radial steps build the falloff along the beam, angular
+    // bands build it across the beam. A single cone reads as a hard-edged
+    // wedge, which looks like a UI element rather than like light.
+    const radialSteps = 12;
+    const bands = [1, 0.72, 0.45, 0.22];
+
+    for (const band of bands) {
+      for (let i = radialSteps; i >= 1; i--) {
+        const t = i / radialSteps;
+        const reach = range * t * (0.35 + 0.65 * band ** 0.25);
+        const alpha = ((1 - t) * 0.05 + 0.008) * (0.5 + band * 0.5);
+        g.moveTo(origin, origin);
+        g.arc(origin, origin, reach, -half * band, half * band);
+        g.closePath();
+        g.fill({ color, alpha });
+      }
+    }
+
+    // Spill at the feet, so the carrier is lit even when facing away.
+    for (let i = 6; i >= 1; i--) {
+      g.circle(origin, origin, i * 7).fill({ color, alpha: 0.03 });
     }
 
     return this.toTexture(g);
@@ -333,6 +434,12 @@ function iconColorFor(key: string): number {
 }
 
 function fxColorFor(key: string): number {
+  if (key.startsWith('fx.anomaly.')) {
+    // Anomaly colour is content, not a render decision: telling a Bleiche from
+    // a Stillstand at a glance is a gameplay requirement (ADR-008).
+    const kind = key.slice('fx.anomaly.'.length);
+    return findAnomaly(kind)?.color ?? PALETTE.echo;
+  }
   if (key.includes('anomaly')) return PALETTE.echo;
   if (key.includes('muzzle')) return 0xffe6a8;
   if (key.includes('flesh')) return PALETTE.danger;

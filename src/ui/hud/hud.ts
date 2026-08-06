@@ -21,6 +21,7 @@ export interface HudCallbacks {
   onUseItem(itemId: string): void;
   onThrowItem(itemId: string): void;
   onMelee(): void;
+  onToggleLight(): void;
 }
 
 export class Hud {
@@ -50,6 +51,8 @@ export class Hud {
   private readonly boss: HTMLElement;
   private readonly bossName: HTMLElement;
   private readonly bossBar: BarHandle;
+  private readonly lightBtn: HTMLElement;
+  private readonly conditions: HTMLElement;
 
   /** Cached values so the DOM is only touched on real change. */
   private last = {
@@ -61,6 +64,9 @@ export class Hud {
     contextLabel: '',
     quickUseKey: '',
     throwKey: '',
+    jammed: false,
+    lightOn: false,
+    weather: '',
   };
 
   private bannerTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -119,6 +125,17 @@ export class Hud {
 
     this.minimap = new Minimap(108);
 
+    // The lamp lives with the other held-state buttons, not in the menus: it
+    // is a decision the player makes mid-room, repeatedly.
+    this.lightBtn = el('button', {
+      className: 'hud__icon-btn hud__icon-btn--light',
+      text: '☀',
+      attrs: { 'aria-label': 'Licht' },
+      data: { uiControl: 'true' },
+      onClick: () => this.callbacks.onToggleLight(),
+    });
+    this.conditions = el('div', { className: 'hud__conditions', text: '' });
+
     this.root = el('div', {
       className: 'hud',
       children: [
@@ -139,9 +156,11 @@ export class Hud {
         this.timer,
         this.boss,
         this.minimap.root,
+        this.conditions,
         el('div', {
           className: 'hud__topright',
           children: [
+            this.lightBtn,
             el('button', {
               className: 'hud__icon-btn',
               text: '▤',
@@ -215,8 +234,34 @@ export class Hud {
     this.updateExtraction(vm);
     this.updateQuickUse(vm);
     this.updateThrowables(vm);
+    this.updateConditions(vm);
     this.updateSticks();
     this.minimap.update(vm, grid);
+  }
+
+  /**
+   * Weather label, lamp state and the Flüstern blackout.
+   *
+   * A jammed HUD hides the minimap rather than freezing it: a map that is
+   * merely stale is worse than no map, because the player keeps trusting it.
+   */
+  private updateConditions(vm: HudViewModel): void {
+    if (vm.weatherName !== this.last.weather) {
+      this.last.weather = vm.weatherName;
+      this.conditions.textContent = vm.weatherName;
+    }
+
+    if (vm.lightOn !== this.last.lightOn) {
+      this.last.lightOn = vm.lightOn;
+      this.lightBtn.classList.toggle('is-active', vm.lightOn);
+    }
+
+    if (vm.hudJammed === this.last.jammed) return;
+    this.last.jammed = vm.hudJammed;
+    this.minimap.root.style.display = vm.hudJammed ? 'none' : '';
+    this.root.classList.toggle('is-jammed', vm.hudJammed);
+    // Force the ammo readout to redraw with (or without) the jam notice.
+    this.last.ammoText = '';
   }
 
   private updateVitals(vm: HudViewModel): void {
@@ -245,6 +290,17 @@ export class Hud {
   }
 
   private updateAmmo(vm: HudViewModel): void {
+    if (vm.hudJammed) {
+      // Instruments are down. Saying so is honest and, on a small screen, far
+      // more alarming than a number that quietly stops being true.
+      if (this.last.ammoText === 'jammed') return;
+      this.last.ammoText = 'jammed';
+      clear(this.ammo);
+      this.ammo.appendChild(el('span', { className: 'is-empty', text: '— — —' }));
+      this.ammo.appendChild(el('small', { text: ' Signal gestört' }));
+      return;
+    }
+
     const text = vm.jammed
       ? 'jam'
       : vm.reloading

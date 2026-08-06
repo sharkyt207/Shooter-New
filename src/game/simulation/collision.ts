@@ -7,7 +7,7 @@
  */
 
 import { circleVsAabb, type Aabb, type Penetration } from '@/core/math/shapes';
-import { CELL_WALL, type MapGrid } from '@/game/map/mapGrid';
+import type { MapGrid } from '@/game/map/mapGrid';
 
 /** Scratch objects - this runs for every actor, every tick. */
 const scratchBox: Aabb = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
@@ -90,7 +90,8 @@ function resolveAgainstWalls(
 
   for (let cy = minCy; cy <= maxCy; cy++) {
     for (let cx = minCx; cx <= maxCx; cx++) {
-      if (grid.get(cx, cy) !== CELL_WALL) continue;
+      // A closed door is as solid as a wall until somebody opens it.
+      if (!grid.isBlocking(cx, cy)) continue;
 
       grid.cellBounds(cx, cy, scratchBox);
       circleVsAabb(cx2, cy2, radius, scratchBox, scratchPen);
@@ -117,7 +118,7 @@ export function isPositionFree(grid: MapGrid, x: number, y: number, radius: numb
 
   for (let cy = minCy; cy <= maxCy; cy++) {
     for (let cx = minCx; cx <= maxCx; cx++) {
-      if (grid.get(cx, cy) !== CELL_WALL) continue;
+      if (!grid.isBlocking(cx, cy)) continue;
       grid.cellBounds(cx, cy, scratchBox);
       circleVsAabb(x, y, radius, scratchBox, scratchPen);
       if (scratchPen.depth > 0) return false;

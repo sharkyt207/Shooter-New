@@ -9,12 +9,14 @@
  *   2. ground     zone rings and anomaly fields, painted on the floor
  *   3. entities   walls, props, actors, loot - depth-sorted every frame
  *   4. vfx        muzzle flashes, impacts, floating damage numbers
- *   5. darkness   radial mask centred on the player
- *   6. overlay    additive lights punched back through the darkness
+ *   5. darkness   radial mask centred on the player, scaled by the weather
+ *   6. lights     additive lights punched back through the darkness
+ *   7. weather    screen-space particles, on top of everything
  */
 
 import { Container, Graphics, Sprite, Text } from 'pixi.js';
-import { ANOMALY } from '@/content/balance';
+import { getAnomaly } from '@/content/anomalies';
+import { LIGHT } from '@/content/balance';
 import { getBiome } from '@/content/biomes';
 import { findWeapon } from '@/content/weapons';
 import type { EntityId } from '@/core/ecs/entity';
@@ -38,6 +40,8 @@ import {
 /** Pool sizes tuned to the entity budget in docs/01-ARCHITECTURE.md. */
 const MAX_WALL_SPRITES = 900;
 const MAX_VFX = 160;
+/** Weather particles at full density. Screen-space, so this is a fixed cost. */
+const MAX_WEATHER_PARTICLES = 110;
 
 /**
  * Reusable projection targets for the per-frame loops.
@@ -62,6 +66,15 @@ interface DamageNumber {
   worldY: number;
 }
 
+/** A drifting weather mote, positioned in screen space and wrapped at the edges. */
+interface WeatherParticle {
+  sprite: Sprite;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+}
+
 export class WorldRenderer {
   readonly stage = new Container();
   readonly camera: Camera;
@@ -73,6 +86,7 @@ export class WorldRenderer {
   private readonly vfxLayer = new Container();
   private readonly darknessLayer = new Container();
   private readonly lightLayer = new Container();
+  private readonly weatherLayer = new Container();
 
   private readonly entitySprites = new Map<EntityId, Sprite>();
   private readonly wallPool: Sprite[] = [];
@@ -83,6 +97,19 @@ export class WorldRenderer {
 
   private darknessSprite: Sprite | null = null;
   private readonly zoneRings = new Map<string, Sprite>();
+  private readonly anomalyFields = new Map<EntityId, Sprite>();
+  /** Asset key each entity sprite currently shows, so a change can swap it. */
+  private readonly entityAssetKeys = new Map<EntityId, string>();
+  /**
+   * Outer container carries the isometric squash, inner sprite the rotation.
+   * That order - scale outside, rotate inside - is what maps a world-space cone
+   * onto the 2:1 projection; the reverse produces a cone that leans as it turns.
+   */
+  private lightConeHolder: Container | null = null;
+  private lightConeSprite: Sprite | null = null;
+  /** Screen-space angle offset that turns a world heading into an iso heading. */
+
+  private readonly weatherParticles: WeatherParticle[] = [];
   private readonly unsubscribes: Array<() => void> = [];
 
   private sim: RaidSimulation | null = null;
@@ -105,7 +132,13 @@ export class WorldRenderer {
 
     this.entityLayer.sortableChildren = true;
     this.world.addChild(this.floorLayer, this.groundLayer, this.entityLayer, this.vfxLayer);
-    this.stage.addChild(this.world, this.darknessLayer, this.lightLayer, this.debugGraphics);
+    this.stage.addChild(
+      this.world,
+      this.darknessLayer,
+      this.lightLayer,
+      this.weatherLayer,
+      this.debugGraphics,
+    );
 
     // The darkness mask multiplies the scene down; lights are added back on top.
     this.lightLayer.blendMode = 'add';
@@ -121,6 +154,12 @@ export class WorldRenderer {
     this.buildFloor(sim);
     this.buildZoneRings(sim);
     this.buildDarkness(sim);
+    this.buildLightCone();
+    this.buildWeather(sim);
+
+    // Weather tints the whole world in one place. Cheap, and it is the single
+    // strongest cue that this raid is not the last one.
+    this.world.tint = sim.weather.tint;
 
     this.camera.snapTo(sim.map.playerSpawn.x, sim.map.playerSpawn.y);
     this.subscribe(sim);
@@ -150,9 +189,15 @@ export class WorldRenderer {
 
     for (const sprite of this.entitySprites.values()) sprite.destroy();
     this.entitySprites.clear();
+    this.entityAssetKeys.clear();
 
     this.groundLayer.removeChildren();
     this.zoneRings.clear();
+    this.anomalyFields.clear();
+
+    for (const particle of this.weatherParticles) particle.sprite.destroy();
+    this.weatherParticles.length = 0;
+    this.weatherLayer.removeChildren();
 
     for (const item of this.activeVfx) item.sprite.visible = false;
     this.activeVfx.length = 0;
@@ -182,6 +227,9 @@ export class WorldRenderer {
     this.updateWalls(sim);
     this.updateEntities(sim, alpha);
     this.updateZones(sim);
+    this.updateAnomalyFields(sim);
+    this.updateLightCone(sim, alpha);
+    this.updateWeather(dt);
     this.updateVfx(dt);
     this.updateDamageNumbers(dt);
     if (this.debugEnabled) this.drawDebug(sim);
@@ -217,6 +265,9 @@ export class WorldRenderer {
     }
 
     this.world.position.set(-this.offsetX, -this.offsetY);
+    // Lights live in world space too, so a light can simply be placed at the
+    // same projected coordinates as the entity carrying it.
+    this.lightLayer.position.set(-this.offsetX, -this.offsetY);
 
     if (this.darknessSprite) {
       // The mask stays centred on the screen, so it tracks the camera for free.
@@ -323,32 +374,107 @@ export class WorldRenderer {
     }
 
     // Anomaly fields are painted on the ground too - they must be visible from
-    // far away so the player can decide whether to approach.
+    // far away so the player can decide whether to approach, and they must be
+    // told apart by colour alone, because that is the only cue at that range.
     for (const [entity, anomaly] of sim.world.anomalies.entries()) {
       const transform = sim.world.transforms.get(entity);
       if (!transform) continue;
 
-      const sprite = new Sprite(this.assets.getTexture('fx.anomaly.core'));
+      const def = getAnomaly(anomaly.kind);
+      const sprite = new Sprite(this.assets.getTexture(`fx.anomaly.${anomaly.kind}`));
       sprite.anchor.set(0.5);
       const screen = worldToScreen(transform.x, transform.y);
       sprite.position.set(screen.x, screen.y);
       sprite.width = anomaly.radius * ISO_X * 2;
       sprite.height = anomaly.radius * ISO_Y * 2;
+      sprite.tint = def.color;
       sprite.alpha = 0.55;
       sprite.blendMode = 'add';
       this.groundLayer.addChild(sprite);
+      this.anomalyFields.set(entity, sprite);
     }
   }
 
+  /**
+   * The vignette that carries the game's tension (Pillar P3).
+   *
+   * Its strength comes from the weather: a night-side fragment closes the
+   * visible circle down to almost nothing, which is what makes the flashlight -
+   * and the decision to switch it on - matter at all.
+   */
   private buildDarkness(sim: RaidSimulation): void {
-    if (!this.darknessSprite) {
-      const biome = getBiome(sim.map.fragments[0]?.biomeId ?? 'biome_lab');
-      const texture = this.placeholders.buildDarkness(512, darkenTowardVoid(biome.ambientColor));
-      const sprite = new Sprite(texture);
+    if (this.darknessSprite) {
+      this.darknessSprite.destroy();
+      this.darknessSprite = null;
+    }
+
+    const biome = getBiome(sim.map.fragments[0]?.biomeId ?? 'biome_lab');
+    const intensity = Math.min(2.4, 1 / Math.max(0.2, sim.weather.lightMultiplier));
+    const texture = this.placeholders.buildDarkness(
+      512,
+      darkenTowardVoid(biome.ambientColor),
+      intensity,
+    );
+
+    const sprite = new Sprite(texture);
+    sprite.anchor.set(0.5);
+    this.darknessLayer.addChild(sprite);
+    this.darknessSprite = sprite;
+    this.resize(this.camera.viewWidth, this.camera.viewHeight);
+  }
+
+  private buildLightCone(): void {
+    if (this.lightConeHolder) return;
+
+    const texture = this.placeholders.buildLightCone(LIGHT.coneRange, LIGHT.coneDeg, 0xfff1c9);
+    const sprite = new Sprite(texture);
+    sprite.anchor.set(0.5);
+
+    const holder = new Container();
+    holder.addChild(sprite);
+    // The 2:1 squash lives here, outside the sprite's rotation.
+    holder.scale.set(1, 0.5);
+    holder.visible = false;
+
+    this.lightLayer.addChild(holder);
+    this.lightConeHolder = holder;
+    this.lightConeSprite = sprite;
+  }
+
+  /**
+   * Weather particles live in screen space.
+   *
+   * Anchoring them to the world would mean spawning and culling thousands as
+   * the camera moves; drifting them across the viewport looks the same and
+   * costs a fixed number of sprites no matter how large the map is.
+   */
+  private buildWeather(sim: RaidSimulation): void {
+    const density = sim.weather.particleDensity;
+    if (density <= 0) return;
+
+    const count = Math.round(MAX_WEATHER_PARTICLES * density);
+    const rng = new SeededRandom(sim.seed ^ 0x5eed);
+    const storm = sim.weather.id === 'storm';
+
+    for (let i = 0; i < count; i++) {
+      const sprite = new Sprite(this.assets.getTexture('fx.anomaly.stillness'));
       sprite.anchor.set(0.5);
-      this.darknessLayer.addChild(sprite);
-      this.darknessSprite = sprite;
-      this.resize(this.camera.viewWidth, this.camera.viewHeight);
+      sprite.tint = sim.weather.tint;
+      sprite.alpha = storm ? 0.24 : 0.16;
+      const size = storm ? rng.range(2, 5) : rng.range(14, 34);
+      sprite.width = size * (storm ? 1 : 2.2);
+      sprite.height = size;
+      sprite.blendMode = storm ? 'normal' : 'add';
+      this.weatherLayer.addChild(sprite);
+
+      this.weatherParticles.push({
+        sprite,
+        x: rng.range(-900, 900),
+        y: rng.range(-700, 700),
+        // A storm drives hard and diagonally; fog barely moves at all.
+        vx: storm ? rng.range(-420, -260) : rng.range(-16, 16),
+        vy: storm ? rng.range(320, 520) : rng.range(-9, 9),
+      });
     }
   }
 
@@ -439,6 +565,14 @@ export class WorldRenderer {
         sprite.anchor.set(asset.anchorX, asset.anchorY);
         this.entityLayer.addChild(sprite);
         this.entitySprites.set(entity, sprite);
+        this.entityAssetKeys.set(entity, renderable.assetKey);
+      } else if (this.entityAssetKeys.get(entity) !== renderable.assetKey) {
+        // The simulation changed what this entity *is* - a door that just swung
+        // open. Swap the texture rather than rebuilding the sprite.
+        const asset = this.assets.get(renderable.assetKey);
+        sprite.texture = asset.texture;
+        sprite.anchor.set(asset.anchorX, asset.anchorY);
+        this.entityAssetKeys.set(entity, renderable.assetKey);
       }
 
       const x = lerp(transform.prevX, transform.x, alpha);
@@ -469,6 +603,91 @@ export class WorldRenderer {
       if (seen.has(entity)) continue;
       sprite.destroy();
       this.entitySprites.delete(entity);
+      this.entityAssetKeys.delete(entity);
+    }
+  }
+
+  /**
+   * Breathe the anomaly fields.
+   *
+   * `phase` is advanced by the simulation, not by frame time, so every client
+   * of the same seed sees the same rhythm - and a Rückstoß, whose pulse is a
+   * timing puzzle, is never a frame ahead of the damage it deals.
+   */
+  private updateAnomalyFields(sim: RaidSimulation): void {
+    for (const [entity, sprite] of this.anomalyFields) {
+      const anomaly = sim.world.anomalies.get(entity);
+      if (!anomaly) {
+        sprite.visible = false;
+        continue;
+      }
+
+      if (anomaly.kind === 'recoil') {
+        // Wind-up: the field swells towards the pulse and snaps back after it,
+        // so the player can read the rhythm instead of memorising a number.
+        const t = clamp01(anomaly.timer / 3.2);
+        sprite.alpha = 0.32 + t * t * 0.55;
+        const swell = 1 + t * 0.12;
+        sprite.width = anomaly.radius * ISO_X * 2 * swell;
+        sprite.height = anomaly.radius * ISO_Y * 2 * swell;
+        continue;
+      }
+
+      sprite.alpha = 0.42 + Math.sin(anomaly.phase) * 0.16;
+    }
+  }
+
+  /**
+   * Position and orient the flashlight.
+   *
+   * The holder carries the isometric squash and the sprite carries the
+   * rotation, so the cone is the world-space cone mapped through the projection
+   * rather than a screen-space wedge that happens to point roughly right.
+   */
+  private updateLightCone(sim: RaidSimulation, alpha: number): void {
+    const holder = this.lightConeHolder;
+    const sprite = this.lightConeSprite;
+    if (!holder || !sprite) return;
+
+    const player = sim.world.playerEntity;
+    const tag = player !== null ? sim.world.players.get(player) : undefined;
+    const transform = player !== null ? sim.world.transforms.get(player) : undefined;
+
+    if (!tag?.lightOn || !transform) {
+      holder.visible = false;
+      return;
+    }
+
+    holder.visible = true;
+
+    const x = lerp(transform.prevX, transform.x, alpha);
+    const y = lerp(transform.prevY, transform.y, alpha);
+    const screen = worldToScreen(x, y, projScratch);
+    holder.position.set(screen.x, screen.y);
+
+    const rotation = lerpAngle(transform.prevRotation, transform.rotation, alpha);
+    // +45 degrees: the isometric map is a rotation by a quarter turn followed
+    // by the non-uniform scale the holder applies.
+    sprite.rotation = rotation + Math.PI / 4;
+  }
+
+  private updateWeather(dt: number): void {
+    if (this.weatherParticles.length === 0) return;
+
+    const halfW = this.camera.viewWidth * 0.5 + 60;
+    const halfH = this.camera.viewHeight * 0.5 + 60;
+
+    for (const particle of this.weatherParticles) {
+      particle.x += particle.vx * dt;
+      particle.y += particle.vy * dt;
+
+      // Wrap rather than respawn: no allocation, and no visible popping.
+      if (particle.x < -halfW) particle.x += halfW * 2;
+      if (particle.x > halfW) particle.x -= halfW * 2;
+      if (particle.y < -halfH) particle.y += halfH * 2;
+      if (particle.y > halfH) particle.y -= halfH * 2;
+
+      particle.sprite.position.set(particle.x, particle.y);
     }
   }
 
@@ -516,6 +735,29 @@ export class WorldRenderer {
     this.unsubscribes.push(
       sim.bus.on('entity:died', (event) => {
         this.spawnVfx('fx.impact.flesh', event.x, event.y, 0.5, 0.6, 1.4);
+      }),
+    );
+
+    // A Rückstoß pulse is a timing puzzle, so it needs an unmistakable tell:
+    // a shockwave the size of the field, plus a shake that scales with it.
+    this.unsubscribes.push(
+      sim.bus.on('anomaly:pulsed', (event) => {
+        this.spawnVfx('fx.anomaly.recoil', event.x, event.y, 0.55, event.radius * 0.35, event.radius * 1.1);
+        this.camera.addShake(0.4);
+      }),
+    );
+
+    // An echo is a ghost, not an explosion: faint, brief, and gone.
+    this.unsubscribes.push(
+      sim.bus.on('anomaly:echo', (event) => {
+        this.spawnVfx('fx.anomaly.echoshadow', event.x, event.y, 1.1, 0.5, 0.85);
+      }),
+    );
+
+    this.unsubscribes.push(
+      sim.bus.on('door:opened', (event) => {
+        this.spawnVfx('fx.impact.wall', event.x, event.y, 0.3, 0.3, 0.7);
+        if (event.wasLocked) this.camera.addShake(0.16);
       }),
     );
 
@@ -690,7 +932,7 @@ export class WorldRenderer {
         color: PALETTE.echo,
         alpha: 0.6,
       });
-      const core = anomaly.radius * ANOMALY.stillnessCoreFraction;
+      const core = anomaly.radius * getAnomaly(anomaly.kind).coreFraction;
       g.ellipse(screen.x, screen.y, core * ISO_X, core * ISO_Y).stroke({
         width: 1,
         color: PALETTE.danger,
@@ -702,6 +944,14 @@ export class WorldRenderer {
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+/** Interpolate a heading the short way round, so it never spins on wrap. */
+function lerpAngle(a: number, b: number, t: number): number {
+  let delta = b - a;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  return a + delta * t;
 }
 
 function scaleColor(color: number, factor: number): number {

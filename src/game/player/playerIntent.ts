@@ -28,6 +28,8 @@ export interface PlayerIntent {
   /** Throwable to throw this tick, in the current aim direction. */
   throwItemId: string | null;
   melee: boolean;
+  /** Flip the flashlight. One shot, so a held button cannot strobe it. */
+  toggleLight: boolean;
 }
 
 export function createIntent(): PlayerIntent {
@@ -45,6 +47,7 @@ export function createIntent(): PlayerIntent {
     dropQuantity: 0,
     throwItemId: null,
     melee: false,
+    toggleLight: false,
   };
 }
 
@@ -66,6 +69,7 @@ export function copyIntent(target: PlayerIntent, source: Readonly<PlayerIntent>)
   }
   if (source.throwItemId !== null) target.throwItemId = source.throwItemId;
   if (source.melee) target.melee = true;
+  if (source.toggleLight) target.toggleLight = true;
 }
 
 export function clearOneShots(intent: PlayerIntent): void {
@@ -74,4 +78,5 @@ export function clearOneShots(intent: PlayerIntent): void {
   intent.dropQuantity = 0;
   intent.throwItemId = null;
   intent.melee = false;
+  intent.toggleLight = false;
 }

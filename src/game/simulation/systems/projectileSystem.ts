@@ -11,7 +11,6 @@ import type { EntityId } from '@/core/ecs/entity';
 import { remap } from '@/core/math/scalar';
 import { resolveHit } from '@/game/combat/ballistics';
 import { applyDamage, isUnaware } from '@/game/combat/damage';
-import { CELL_WALL } from '@/game/map/mapGrid';
 import type { SimContext } from '@/game/simulation/simContext';
 
 /** Maximum distance a projectile may advance in one collision substep. */
@@ -53,8 +52,9 @@ export function projectileSystem(ctx: SimContext): void {
       }
 
       // Walls first: a round that clips a corner should not reach the actor
-      // standing behind it.
-      if (ctx.grid.get(ctx.grid.worldToCellX(transform.x), ctx.grid.worldToCellY(transform.y)) === CELL_WALL) {
+      // standing behind it. A closed door counts - shooting through one is not
+      // a thing, which is what makes a door worth closing behind you.
+      if (ctx.grid.isWallAtWorld(transform.x, transform.y)) {
         ctx.bus.emit('projectile:impact', { x: transform.x, y: transform.y, surface: 'wall' });
         world.destroyEntity(entity);
         consumed = true;

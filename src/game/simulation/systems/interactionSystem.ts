@@ -150,8 +150,12 @@ function advanceContainerSearch(ctx: SimContext, containerEntity: EntityId): voi
   container.searchProgress = def.searchSeconds;
 
   // Contents are rolled on open, not at map generation: a raid only pays the
-  // cost of the loot the player actually reaches.
-  container.contents = rollLootTable(ctx.rng.loot, def.lootTableId);
+  // cost of the loot the player actually reaches. Guaranteed contents - a
+  // keycard, say - come first and never depend on the roll.
+  container.contents = [
+    ...container.guaranteed.map((entry) => ({ ...entry })),
+    ...rollLootTable(ctx.rng.loot, def.lootTableId),
+  ];
 
   const transform = ctx.world.transforms.require(containerEntity);
   scatterContents(ctx, container.contents, transform.x, transform.y);

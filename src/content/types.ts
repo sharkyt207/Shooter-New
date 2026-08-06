@@ -21,7 +21,8 @@ export type ItemCategory =
   | 'armor'
   | 'backpack'
   | 'attachment'
-  | 'throwable';
+  | 'throwable'
+  | 'key';
 
 /**
  * Where a hit lands.

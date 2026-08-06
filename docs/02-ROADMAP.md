@@ -15,8 +15,8 @@ erst dann das nächste. Kein paralleles Anfangen von Baustellen.
 | **M1** | Vertical Slice / Prototyp | Spielbarer Raid-Loop End-to-End | ✅ abgeschlossen |
 | **M2** | Kampf & Waffen in Tiefe | Munitionstypen, Panzerungsklassen, Trefferzonen, Aufsätze, Wurfgeschosse, Nahkampf | ✅ abgeschlossen |
 | **M3** | Gegner & KI in Tiefe | Flow-Field-Navigation, Fraktionskrieg, Squads, Wächter-Boss | ✅ abgeschlossen |
-| **M4** | Welt & Anomalien | Fragment-Generator v2, alle 5 Anomalien, Wetter/Licht | 🔜 als nächstes |
-| **M5** | Meta: Basis, Crafting, Economy | Basisausbau, Werkbänke, Händler, Schwarzmarkt | ⏳ geplant |
+| **M4** | Welt & Anomalien | Fragment-Generator v2, alle 5 Anomalien, Wetter/Licht | ✅ fertig |
+| **M5** | Meta: Basis, Crafting, Economy | Basisausbau, Werkbänke, Händler, Schwarzmarkt | 🔜 als nächstes |
 | **M6** | Mobile-Härtung | Capacitor, iOS-Build, Performance-Pass, Touch-Politur | ⏳ geplant |
 | **M7** | Content & Art-Pass | Finale Assets, Audio, Onboarding, Lokalisierung | ⏳ geplant |
 | **M8** | Live-Vorbereitung | Telemetrie, Balancing-Tools, optional PvP-Modul, Store-Release | ⏳ geplant |
@@ -116,18 +116,40 @@ Streuungsaufbau modelliert, gedämpft durch Ergonomie.
 Deckung — das braucht eine Sichtbarkeitsanalyse der Karte und lohnt erst mit den
 handgebauten Raum-Prefabs aus M4.
 
-## M4 — Welt & Anomalien (nächster Schritt)
+## M4 — Welt & Anomalien ✅
 
-- Fragment-Generator v2: handgebaute Räume als Prefabs, prozedural verkettet
-- Alle 5 Anomalien mit Gameplay-Wirkung und VFX
-- Dynamisches Licht: Tag/Nacht, Sturm, Riss-Puls, Taschenlampe mit Sichtkegel
-- Türen, Schlösser, Schlüsselkarten, verschlossene Hochwert-Räume
-- Wetter mit Sicht-/Audio-Auswirkung
-- KI-Reaktion auf Anomalien (Gegner laufen aktuell ungerührt hindurch)
-- Deckungspunkte auf Basis der Raum-Prefabs
-- **Doku:** `docs/modules/map.md`, `docs/modules/anomalies.md`
+**Ziel:** Die Welt hört auf, eine Kulisse zu sein, und fängt an, eine Gegnerin
+zu sein.
 
-## M5 — Meta-Progression
+| Feature | Umfang |
+|---------|--------|
+| Fragment-Generator v2 | 8 handgebaute Raum-Prefabs, prozedural eingestempelt, mit eigenen Türen, Loot-, Deckungs- und Gegnerankern |
+| Türen | Zustand im Gitter, Öffnen auf Annäherung, Geräusch beim Öffnen, Sicht/Projektile blockiert |
+| Schlösser & Schlüsselkarten | Vault-Räume mit `+`-Tür; Schlüssel garantiert in einem Behälter außerhalb |
+| Alle 5 Anomalien | Stillstand, Flüstern, Rückstoß, Bleiche, Echo-Schatten — je eine andere *Art* von Problem |
+| Wetter | Klar, Nebel, Sturm, Riss-Puls, Nachtseite — skaliert Sicht, Gehör, Licht, Tönung, Partikel |
+| Dynamisches Licht | Vignette skaliert mit dem Umgebungslicht; Taschenlampe mit echtem, isometrisch korrektem Sichtkegel |
+| Licht als Entscheidung | Lampe an: sehen. Lampe an: gesehen werden (`LIGHT.spottedRangeBonus`) |
+| KI-Reaktion auf Anomalien | `avoidance` je Anomalie → statische Kostenkarte im Flow-Field |
+| Deckungspunkte | Unterdrückende Gegner besetzen die `C`-Posten der Prefabs und halten sie |
+
+**Gefundene und behobene Fehler dieses Meilensteins**
+
+- `pf_double_chamber` und `pf_cargo` hatten ihre Außentür unter einer Innenwand.
+  Der Raum stempelte korrekt und ließ den Erreichbarkeitspass danach das halbe
+  Fragment löschen (Seeds 5001/42: 24 statt ~1100 offener Zellen). Behoben, und
+  `validatePrefabs()` prüft jetzt Türanschluss **und** Innenkonnektivität.
+- `MapGrid.set()` ließ `doorOf` stehen: eine überschriebene Türzelle wurde zu
+  Boden, der weiterhin alles blockierte — eine unsichtbare Wand.
+- Der Taschenlampenkegel saß neben der Spielfigur: `generateTexture` schneidet
+  auf die gezeichnete Geometrie zu, und der Schwerpunkt eines Kreissektors liegt
+  nicht auf seiner Spitze. Behoben mit einem transparenten Rahmenrechteck.
+  Gefunden vom Browser-Smoke-Test, nicht von den Unit-Tests — genau dafür gibt
+  es ihn.
+
+**Doku:** `docs/modules/map.md`, `docs/modules/anomalies.md`
+
+## M5 — Meta-Progression (nächster Schritt)
 
 - Basisausbau: Lager, Werkbank, Medizin, Forschung, Waffenwerkstatt, Händler, Schwarzmarkt
 - Ausbaustufen mit Kosten, Bauzeit und Freischaltungen

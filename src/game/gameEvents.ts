@@ -117,6 +117,15 @@ export type GameEvents = {
   // ── Anomalies ────────────────────────────────────────────────────────────
   'anomaly:entered': { entity: EntityId; kind: string };
   'anomaly:exited': { entity: EntityId; kind: string };
+  /** A Rückstoß fired. Drives the shockwave ring and the shake. */
+  'anomaly:pulsed': { entity: EntityId; kind: string; x: number; y: number; radius: number };
+  /** An Echo-Schatten replayed a past passer-by at this position. */
+  'anomaly:echo': { entity: EntityId; x: number; y: number };
+
+  // ── Doors ────────────────────────────────────────────────────────────────
+  'door:opened': { entity: EntityId; x: number; y: number; wasLocked: boolean };
+  /** The player touched a locked door without the matching key. */
+  'door:locked': { entity: EntityId; keyItemId: string | null };
 
   // ── Player feedback ──────────────────────────────────────────────────────
   'player:healthChanged': { current: number; max: number };

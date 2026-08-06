@@ -7,7 +7,8 @@ implementiert, getestet, optimiert **und** hier dokumentiert ist
 | Doku | Module | Reifegrad |
 |------|--------|-----------|
 | [core.md](core.md) | `core/ecs`, `core/math`, `core/events`, `core/time`, `core/util` | 🟢 fertig |
-| [map.md](map.md) | `game/map` | 🟢 Prototyp fertig |
+| [map.md](map.md) | `game/map`, `content/prefabs`, `content/weather` | 🟢 M4 fertig |
+| [anomalies.md](anomalies.md) | `content/anomalies`, `game/simulation/systems/anomalySystem` | 🟢 M4 fertig |
 | [combat.md](combat.md) | `game/weapons`, `game/combat` | 🟢 Prototyp fertig |
 | [ai.md](ai.md) | `game/ai`, `game/enemies` | 🟢 Prototyp fertig |
 | [inventory-loot.md](inventory-loot.md) | `game/inventory`, `game/loot` | 🟢 Prototyp fertig |

@@ -10,6 +10,7 @@ import type { EventBus } from '@/core/events/eventBus';
 import type { RandomStreams } from '@/core/math/random';
 import type { EntityId } from '@/core/ecs/entity';
 import type { FactionId } from '@/content/factions';
+import type { WeatherDef } from '@/content/weather';
 import type { GameEvents, RaidOutcomeKind } from '@/game/gameEvents';
 import type { MapGrid } from '@/game/map/mapGrid';
 import type { PlayerIntent } from '@/game/player/playerIntent';
@@ -62,6 +63,22 @@ export interface SimContext {
 
   /** Entities currently inside an anomaly, so enter/exit events fire exactly once. */
   readonly entitiesInAnomaly: Set<EntityId>;
+
+  /**
+   * Weather for this raid. Fixed at generation time from the seed - it scales
+   * sight and hearing for *everyone*, so it changes which approach a raid
+   * rewards rather than simply making one harder.
+   */
+  readonly weather: WeatherDef;
+
+  /**
+   * True while the player stands in a Flüstern: instruments are down.
+   * Recomputed every tick by the anomaly system and read by the view model.
+   */
+  hudJammed: boolean;
+
+  /** Cover positions from the stamped room prefabs. Read by the squad AI. */
+  readonly coverPoints: ReadonlyArray<{ x: number; y: number }>;
 
   /** Seconds until the player may swing again. */
   meleeCooldown: number;

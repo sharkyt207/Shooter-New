@@ -211,6 +211,11 @@ export const AI = {
 
   /** How far a suppressing enemy stays back, as a factor of preferred range. */
   suppressRangeFactor: 1.25,
+
+  /** Metres around itself a suppressing enemy will look for an authored cover post. */
+  coverSearchRadius: 16,
+  /** Within this distance of a cover post an enemy counts as "in cover" and holds. */
+  coverHoldRadius: 1.3,
 } as const;
 
 export const RAID = {
@@ -243,6 +248,11 @@ export const MAP = {
   seamCells: 4,
   /** Minimum number of open cells a fragment must have to be usable. */
   minOpenCells: 120,
+  /** Prefab rooms stamped into each fragment. */
+  prefabsPerFragment: { min: 1, max: 3 },
+  /** Cells of clearance kept around a stamped prefab. */
+  prefabMargin: 2,
+
   /**
    * Chance a raid contains a Warden.
    * Not every raid: a boss in every rift would make it routine rather than an
@@ -277,15 +287,63 @@ export const ECONOMY = {
   xpCurveExponent: 1.35,
 } as const;
 
+export const DOORS = {
+  /**
+   * Metres at which an actor pushes a door open.
+   *
+   * Doors open on approach rather than on a button. On a touch screen an extra
+   * verb the player must find mid-fight is a design failure (Pillar P4), and an
+   * automatic door removes a whole class of AI-stuck-on-the-frame bugs.
+   */
+  autoOpenRange: 1.5,
+  /** Metres the sound of a door carries. Opening one is not free. */
+  noiseRadius: 11,
+  /** Extra hearing radius for a door that had to be forced with a key. */
+  lockedNoiseRadius: 16,
+} as const;
+
+export const LIGHT = {
+  /** Ambient level below which the game counts as dark enough to need a lamp. */
+  darkThreshold: 0.72,
+  /** Metres the flashlight reaches. */
+  coneRange: 11,
+  /** Full width of the flashlight cone, in degrees. */
+  coneDeg: 62,
+  /**
+   * How much further an enemy spots a player carrying a lit lamp.
+   * This is the trade the night side of a fragment is built on: see, or be
+   * unseen. Never both.
+   */
+  spottedRangeBonus: 1.55,
+} as const;
+
 export const ANOMALY = {
-  /** Radius in metres of a Stillstand anomaly. */
-  stillnessRadius: 4.5,
-  /** Movement and projectile speed multiplier inside it. */
+  /** Movement and projectile speed multiplier at the centre of a Stillstand. */
   stillnessSlowFactor: 0.35,
-  /** Damage per second taken at the very core. */
+  /** Damage per second at the very core of a Stillstand. */
   stillnessCoreDamagePerSecond: 9,
-  /** Fraction of the radius that counts as the lethal core. */
-  stillnessCoreFraction: 0.35,
+
+  /** Seconds between Rückstoß pulses. Long enough to time a crossing. */
+  recoilPulseSeconds: 3.2,
+  /** Metres per second imparted at the centre of a pulse. */
+  recoilPushSpeed: 11,
+  /** Damage at the centre of a pulse, falling off to the edge. */
+  recoilPulseDamage: 26,
+
+  /** Health per second drained by a Bleiche at its core. */
+  bleachDrainPerSecond: 7,
+
+  /** Seconds an Echo-Schatten remembers a passer-by. */
+  echoMemorySeconds: 45,
+  /** Seconds between recorded samples. */
+  echoSampleSeconds: 1.5,
+  /** Metres an echo's ghost noise carries when it replays. */
+  echoNoiseRadius: 9,
+  /** Seconds between echo replays. */
+  echoReplaySeconds: 6,
+
+  /** Extra strength every anomaly gains during a rift pulse. */
+  riftPulseIntensity: 1.4,
 } as const;
 
 export const INPUT = {

@@ -409,6 +409,19 @@ export const ITEMS = {
     icon: 'icon.item.thr_lure',
   },
 
+  // ── Keys ─────────────────────────────────────────────────────────────────
+  itm_key_vault: {
+    id: 'itm_key_vault',
+    name: 'Sicherheitsschlüssel',
+    description: 'Öffnet eine Sicherheitskammer. Wo die passende steht, sagt er nicht.',
+    category: 'key',
+    rarity: 'rare',
+    weight: 0.05,
+    value: 750,
+    stackSize: 5,
+    icon: 'icon.item.key_vault',
+  },
+
   // ── Materials ────────────────────────────────────────────────────────────
   itm_scrap: {
     id: 'itm_scrap',

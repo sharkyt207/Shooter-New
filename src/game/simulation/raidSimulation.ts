@@ -33,6 +33,7 @@ import { updateWeapons } from '@/game/weapons/firing';
 import {
   createAnomaly,
   createContainer,
+  createDoor,
   createEnemy,
   createExtractionZone,
   createPlayer,
@@ -40,7 +41,8 @@ import {
 import { RaidWorld } from './raidWorld';
 import type { SimContext } from './simContext';
 import { throwableSystem } from '@/game/combat/throwables';
-import { anomalySystem } from './systems/anomalySystem';
+import { anomalySystem, buildAvoidanceOverlay } from './systems/anomalySystem';
+import { doorSystem } from './systems/doorSystem';
 import { deathSystem } from './systems/deathSystem';
 import { extractionSystem } from './systems/extractionSystem';
 import { interactionSystem } from './systems/interactionSystem';
@@ -102,6 +104,9 @@ export class RaidSimulation {
       noises: [],
       interactionTarget: null,
       entitiesInAnomaly: new Set<EntityId>(),
+      weather: this.map.weather,
+      hudJammed: false,
+      coverPoints: this.map.coverPoints,
       meleeCooldown: 0,
       navigation: new NavigationCache(this.grid),
       squads: new SquadRegistry(),
@@ -143,6 +148,16 @@ export class RaidSimulation {
     return this.ctx.squads;
   }
 
+  /** Weather this raid was generated with. */
+  get weather() {
+    return this.ctx.weather;
+  }
+
+  /** True while a Flüstern has the player's instruments down. */
+  get hudJammed(): boolean {
+    return this.ctx.hudJammed;
+  }
+
   /** Feed the current input state. Safe to call many times between ticks. */
   applyIntent(intent: Readonly<PlayerIntent>): void {
     copyIntent(this.intent, intent);
@@ -171,6 +186,9 @@ export class RaidSimulation {
     this.storePreviousTransforms();
 
     playerSystem(this.ctx);
+    // Doors run right after movement: whether one is open decides what the
+    // perception pass can see and what the AI can path through this tick.
+    doorSystem(this.ctx);
     perceptionSystem(this.ctx);
     aiSystem(this.ctx);
     updateWeapons(this.ctx);
@@ -210,11 +228,11 @@ export class RaidSimulation {
 
   private populateWorld(): void {
     const spawn = this.map.playerSpawn;
-    createPlayer(this.world, this.loadout, spawn.x, spawn.y);
+    createPlayer(this.world, this.loadout, spawn.x, spawn.y, this.map.weather.lightMultiplier);
 
     this.spawnEnemies();
     for (const container of this.map.containers) {
-      createContainer(this.world, container.containerId, container.x, container.y);
+      createContainer(this.world, container);
     }
     for (const zone of this.map.extractions) {
       createExtractionZone(this.world, zone);
@@ -222,6 +240,13 @@ export class RaidSimulation {
     for (const anomaly of this.map.anomalies) {
       createAnomaly(this.world, anomaly.kind, anomaly.x, anomaly.y, anomaly.radius);
     }
+    for (const door of this.map.doors) {
+      createDoor(this.world, door);
+    }
+
+    // Anomalies never move, so the AI's caution is baked into a static cost map
+    // once rather than recomputed every time a flow field is built.
+    this.ctx.navigation.setCostOverlay(buildAvoidanceOverlay(this.ctx));
   }
 
   /**

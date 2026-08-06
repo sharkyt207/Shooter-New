@@ -165,10 +165,13 @@ So bleibt die Sim frei von Sound- und VFX-Aufrufen — Feedback wird ausschließ
 **Systemreihenfolge im Raid-Tick (verbindlich):**
 
 ```
-InputIntent → PlayerMovement → EnemyPerception → EnemyAI → EnemyMovement
+InputIntent → PlayerMovement → Doors → EnemyPerception → EnemyAI → EnemyMovement
 → WeaponFire → ProjectileMovement → CollisionResolve → DamageApply → DeathCleanup
 → LootProximity → AnomalyEffects → ExtractionZones → RaidTimer → EventFlush
 ```
+
+`Doors` läuft unmittelbar nach der Bewegung: Ob eine Tür offen ist, entscheidet,
+was die Wahrnehmung in diesem Tick sehen und wohin die KI laufen kann.
 
 Diese Reihenfolge ist Teil des Determinismus-Vertrags und darf nur bewusst und dokumentiert geändert werden.
 

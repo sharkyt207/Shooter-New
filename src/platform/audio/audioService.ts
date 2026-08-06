@@ -30,7 +30,11 @@ export type SoundId =
   | 'extraction.progress'
   | 'extraction.success'
   | 'anomaly.enter'
-  | 'anomaly.exit';
+  | 'anomaly.exit'
+  | 'anomaly.pulse'
+  | 'anomaly.echo'
+  | 'door.open'
+  | 'door.locked';
 
 export interface PlayOptions {
   /** 0..1 */

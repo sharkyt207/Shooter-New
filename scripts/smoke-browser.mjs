@@ -3,7 +3,7 @@
  * PROJECT ECHO - browser smoke test.
  *
  * Drives the real game in a real browser through the whole loop:
- *   menu -> base -> loadout -> briefing -> raid -> move, shoot, inventory
+ *   menu -> base -> loadout -> briefing -> raid -> move, shoot, light, inventory
  *
  * This is the single most valuable test a game can have. Unit tests prove the
  * simulation is correct; only this proves the thing actually starts, renders
@@ -72,29 +72,29 @@ try {
   await page.goto(URL_TARGET, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
 
-  console.log('  1/7 Hauptmenü');
+  console.log('  1/8 Hauptmenü');
   await shot('01-menu');
   await clickButton('Riss betreten');
 
-  console.log('  2/7 Basis');
+  console.log('  2/8 Basis');
   await shot('02-base');
   await clickButton('Ausrüstung wählen');
 
-  console.log('  3/7 Ausrüstung');
+  console.log('  3/8 Ausrüstung');
   await shot('03-loadout');
 
-  console.log('  4/7 Werkstatt');
+  console.log('  4/8 Werkstatt');
   await clickButton('Werkstatt öffnen');
   await shot('04-workshop');
   await clickButton('Zurück');
   await clickButton('Riss betreten');
 
-  console.log('  5/7 Briefing');
+  console.log('  5/8 Briefing');
   await shot('05-briefing');
   await clickButton('Riss betreten');
   await page.waitForTimeout(1800);
 
-  console.log('  6/7 Raid');
+  console.log('  6/8 Raid');
   await shot('06-raid');
 
   // Exercise simulation and renderer together: move, aim, fire.
@@ -109,7 +109,15 @@ try {
   await page.waitForTimeout(400);
   await shot('07-raid-action');
 
-  console.log('  7/7 Inventar');
+  // The flashlight is the one renderer feature that is invisible unless the
+  // raid happens to roll a dark weather, so the smoke test forces it on.
+  console.log('  7/8 Licht');
+  const lightBtn = page.locator('button[aria-label="Licht"]').first();
+  await lightBtn.click();
+  await page.waitForTimeout(500);
+  await shot('09-light');
+
+  console.log('  8/8 Inventar');
   await page.keyboard.press('Tab');
   await page.waitForTimeout(500);
   await shot('08-inventory');
