@@ -30,6 +30,8 @@ export interface PlayerIntent {
   melee: boolean;
   /** Flip the flashlight. One shot, so a held button cannot strobe it. */
   toggleLight: boolean;
+  /** Move one of this item from the pack into the secure container. */
+  secureItemId: string | null;
 }
 
 export function createIntent(): PlayerIntent {
@@ -48,6 +50,7 @@ export function createIntent(): PlayerIntent {
     throwItemId: null,
     melee: false,
     toggleLight: false,
+    secureItemId: null,
   };
 }
 
@@ -70,6 +73,7 @@ export function copyIntent(target: PlayerIntent, source: Readonly<PlayerIntent>)
   if (source.throwItemId !== null) target.throwItemId = source.throwItemId;
   if (source.melee) target.melee = true;
   if (source.toggleLight) target.toggleLight = true;
+  if (source.secureItemId !== null) target.secureItemId = source.secureItemId;
 }
 
 export function clearOneShots(intent: PlayerIntent): void {
@@ -79,4 +83,5 @@ export function clearOneShots(intent: PlayerIntent): void {
   intent.throwItemId = null;
   intent.melee = false;
   intent.toggleLight = false;
+  intent.secureItemId = null;
 }

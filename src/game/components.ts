@@ -284,6 +284,14 @@ export interface Disoriented {
 
 export interface Carrier {
   inventory: InventoryState;
+  /**
+   * The secure container, when one was brought along.
+   *
+   * Its contents come home whatever happens to the carrier - which is why it is
+   * a separate inventory rather than a flag on a slot: weight, capacity and the
+   * "does it fit" question all have to work exactly as they do for the pack.
+   */
+  secure: InventoryState | null;
 }
 
 /** Applied while an entity uses a consumable - it cannot fire or sprint. */

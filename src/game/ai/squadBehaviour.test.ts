@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { AI } from '@/content/balance';
 import { getEnemy } from '@/content/enemies';
 import type { EntityId } from '@/core/ecs/entity';
-import type { Loadout } from '@/game/player/loadout';
+import { createEmptyLoadout, type Loadout } from '@/game/player/loadout';
 import { createIntent } from '@/game/player/playerIntent';
 import { RaidSimulation } from '@/game/simulation/raidSimulation';
 
 function loadout(): Loadout {
   return {
+    ...createEmptyLoadout(),
     weaponItemId: 'itm_wpn_splitter',
     armorItemId: 'itm_armor_fiber',
     helmetItemId: null,

@@ -14,12 +14,20 @@ import { findItem } from '@/content/items';
 import { createLogger } from '@/core/util/logger';
 import { FixedClock } from '@/core/time/fixedClock';
 import { addItem, countItem } from '@/game/inventory/inventory';
+import { createDefaultProfile, type PlayerProfile } from '@/game/base/profile';
 import {
-  createDefaultProfile,
-  upgradeModule,
-  type PlayerProfile,
-} from '@/game/base/profile';
-import { craft } from '@/game/crafting/crafting';
+  collectBuilds,
+  startUpgrade,
+  type BuildFailure,
+} from '@/game/base/buildQueue';
+import { advanceQuest } from '@/game/base/questLine';
+import {
+  collectCrafts,
+  startCraft,
+  type CraftFailure,
+} from '@/game/crafting/craftQueue';
+import { completeContract, refreshContracts } from '@/game/economy/contracts';
+import { collectInsurance } from '@/game/economy/insurance';
 import { fitAttachment, repairWeapon } from '@/game/base/workshop';
 import type { AttachmentSlot } from '@/content/types';
 import {
@@ -33,6 +41,7 @@ import { generateMap, type GeneratedMap } from '@/game/map/mapGenerator';
 import { SeededRandom } from '@/core/math/random';
 import { RaidSimulation } from '@/game/simulation/raidSimulation';
 import { createIntent, type PlayerIntent } from '@/game/player/playerIntent';
+import { secureCapacityKg } from '@/game/player/loadout';
 import { NullAudio, type AudioService } from '@/platform/audio/audioService';
 import { CompositeInput } from '@/platform/input/inputSource';
 import { KeyboardMouseInput } from '@/platform/input/keyboardMouseInput';
@@ -58,6 +67,23 @@ import { createResultScreen } from '@/ui/screens/resultScreen';
 import { createWorkshopScreen } from '@/ui/screens/workshopScreen';
 import { GameStateMachine } from './gameStateMachine';
 import { buildHudViewModel, type HudViewModel } from '@/ui/viewModel';
+
+/** Why a build could not start, in the player's language. */
+const BUILD_MESSAGES: Record<BuildFailure, string> = {
+  unknownModule: 'Unbekanntes Modul.',
+  maxLevel: 'Maximale Stufe erreicht.',
+  notEnoughCredits: 'Nicht genug Credits.',
+  requirementsNotMet: 'Voraussetzungen fehlen.',
+  alreadyBuilding: 'Wird bereits gebaut.',
+};
+
+const CRAFT_MESSAGES: Record<CraftFailure, string> = {
+  unknownRecipe: 'Unbekanntes Rezept.',
+  moduleTooLow: 'Werkbank zu niedrig.',
+  missingInputs: 'Material fehlt.',
+  noSpace: 'Lager voll.',
+  queueFull: 'Werkbank ausgelastet.',
+};
 
 const log = createLogger('game');
 const VERSION = '0.1.0';
@@ -243,38 +269,38 @@ export class Game {
   }
 
   private showBaseScreen(): void {
+    this.collectMeta();
+
     this.ui.setScreen(
       createBaseScreen(this.profile, {
+        now: () => Date.now(),
         onStartLoadout: () => this.states.transitionTo('loadout'),
 
         onUpgrade: (moduleId) => {
-          const result = upgradeModule(this.profile, moduleId);
+          const result = startUpgrade(this.profile, moduleId, Date.now());
           if (!result.ok) {
-            this.ui.toast(
-              result.reason === 'notEnoughCredits'
-                ? 'Nicht genug Credits.'
-                : 'Maximale Stufe erreicht.',
-            );
+            this.ui.toast(BUILD_MESSAGES[result.reason ?? 'unknownModule']);
             return;
           }
-          this.ui.toast(`Ausgebaut auf Stufe ${result.newLevel}.`);
+          this.ui.toast(result.instant ? 'Ausgebaut.' : 'Bau begonnen.');
           void this.saveProfile();
           this.showBaseScreen();
         },
 
-        onSell: (itemId, quantity) => {
-          const result = sellItem(this.profile, itemId, quantity);
+        onSell: (itemId, quantity, traderId) => {
+          const result = sellItem(this.profile, itemId, quantity, traderId);
           if (!result.ok) {
-            this.ui.toast('Nicht verfügbar.');
+            this.ui.toast(result.reason === 'refused' ? 'Das kauft er nicht.' : 'Nicht verfügbar.');
             return;
           }
           this.ui.toast(`+${result.credits} ¢`);
+          if (result.newTier) this.ui.toast(`Ruf gestiegen: Stufe ${result.newTier}`, 2200);
           void this.saveProfile();
           this.showBaseScreen();
         },
 
-        onBuy: (itemId, quantity) => {
-          const result = buyItem(this.profile, itemId, quantity);
+        onBuy: (itemId, quantity, traderId) => {
+          const result = buyItem(this.profile, itemId, quantity, traderId);
           if (!result.ok) {
             this.ui.toast(
               result.reason === 'notEnoughCredits' ? 'Nicht genug Credits.' : 'Lager voll.',
@@ -286,23 +312,78 @@ export class Game {
         },
 
         onCraft: (recipeId) => {
-          const result = craft(this.profile, recipeId);
+          const result = startCraft(this.profile, recipeId, Date.now());
           if (!result.ok) {
-            this.ui.toast(
-              result.reason === 'missingInputs'
-                ? 'Material fehlt.'
-                : result.reason === 'moduleTooLow'
-                  ? 'Werkbank zu niedrig.'
-                  : 'Lager voll.',
-            );
+            this.ui.toast(CRAFT_MESSAGES[result.reason ?? 'unknownRecipe']);
             return;
           }
-          this.ui.toast('Hergestellt.');
+          this.ui.toast('In Arbeit.');
+          void this.saveProfile();
+          this.showBaseScreen();
+        },
+
+        onCompleteContract: (templateId) => {
+          const result = completeContract(this.profile, templateId);
+          if (!result.ok) {
+            this.ui.toast('Material fehlt.');
+            return;
+          }
+          this.ui.toast(`Auftrag erfüllt · +${result.credits} ¢`, 2200);
+          if (result.newTier) this.ui.toast(`Ruf gestiegen: Stufe ${result.newTier}`, 2200);
           void this.saveProfile();
           this.showBaseScreen();
         },
       }),
     );
+  }
+
+  /**
+   * Bring the base up to date with the wall clock.
+   *
+   * Builds, crafts and insurance all run in real time and keep running during a
+   * raid - so this is called whenever the player arrives at the base, and it is
+   * the only place those queues are drained.
+   */
+  private collectMeta(): void {
+    const now = Date.now();
+    let changed = false;
+
+    for (const build of collectBuilds(this.profile, now)) {
+      this.ui.toast(`${build.moduleName} Stufe ${build.level} fertig.`, 2600);
+      changed = true;
+    }
+
+    for (const craft of collectCrafts(this.profile, now)) {
+      this.ui.toast(
+        craft.failed
+          ? `${craft.recipeName}: fehlgeschlagen, Material teilweise zurück.`
+          : `${craft.recipeName} fertiggestellt.`,
+        2600,
+      );
+      if (!craft.failed) {
+        for (const completion of advanceQuest(this.profile, { crafted: 1 }, now)) {
+          this.ui.toast(`Auftrag abgeschlossen: ${completion.stage.name}`, 3000);
+        }
+      }
+      changed = true;
+    }
+
+    for (const entry of collectInsurance(this.profile, now)) {
+      const def = findItem(entry.itemId);
+      this.ui.toast(`Versicherung: ${def?.name ?? entry.itemId} ×${entry.quantity}`, 2600);
+      changed = true;
+    }
+
+    // The base level can satisfy a quest stage on its own, so nudge the line
+    // whenever the base changed.
+    if (changed) {
+      for (const completion of advanceQuest(this.profile, {}, now)) {
+        this.ui.toast(`Auftrag abgeschlossen: ${completion.stage.name}`, 3000);
+      }
+    }
+
+    if (refreshContracts(this.profile, now)) changed = true;
+    if (changed) void this.saveProfile();
   }
 
   private showLoadoutScreen(): void {
@@ -330,6 +411,29 @@ export class Game {
           }
 
           this.profile.loadout[key] = itemId;
+          void this.saveProfile();
+          this.showLoadoutScreen();
+        },
+
+        onEquipSecure: (itemId) => {
+          // Swapping containers empties the old one back into the stash rather
+          // than silently dropping what was inside it.
+          if (itemId !== this.profile.loadout.secureContainerItemId) {
+            this.profile.loadout.secureItems = [];
+          }
+          this.profile.loadout.secureContainerItemId = itemId;
+          void this.saveProfile();
+          this.showLoadoutScreen();
+        },
+
+        onSecureChange: (itemId, delta) => {
+          this.changeSecure(itemId, delta);
+          void this.saveProfile();
+          this.showLoadoutScreen();
+        },
+
+        onToggleInsurance: () => {
+          this.profile.loadout.insured = !this.profile.loadout.insured;
           void this.saveProfile();
           this.showLoadoutScreen();
         },
@@ -553,12 +657,64 @@ export class Game {
     const outcome = this.sim?.outcome;
     if (!outcome) return;
 
-    this.lastReport = settleRaid(this.profile, outcome);
+    this.lastReport = settleRaid(this.profile, outcome, Date.now());
+    this.reportSettlement(this.lastReport);
     this.ensurePlayable();
     this.repairLoadout();
     void this.saveProfile();
     this.audio.play(outcome.kind === 'extracted' ? 'extraction.success' : 'player.die');
     this.states.transitionTo('result');
+  }
+
+  /**
+   * Move an item between the stash and the secure container.
+   *
+   * The stash is the source of truth until the raid starts: what sits in the
+   * container list is a *reservation*, and `commitLoadout` is what actually
+   * takes it. So this only has to respect the container's weight limit.
+   */
+  private changeSecure(itemId: string, delta: number): void {
+    const { loadout } = this.profile;
+    const slots = loadout.secureItems;
+    const existing = slots.find((slot) => slot.itemId === itemId);
+
+    if (delta < 0) {
+      if (!existing) return;
+      existing.quantity += delta;
+      if (existing.quantity <= 0) {
+        loadout.secureItems = slots.filter((slot) => slot !== existing);
+      }
+      return;
+    }
+
+    const reserved = slots.reduce((sum, slot) => sum + slot.quantity, 0);
+    void reserved;
+    const inStash = countItem(this.profile.stash, itemId);
+    const alreadyTaken = existing?.quantity ?? 0;
+    if (alreadyTaken + delta > inStash) return;
+
+    const weight = findItem(itemId)?.weight ?? 0;
+    const used = slots.reduce(
+      (sum, slot) => sum + (findItem(slot.itemId)?.weight ?? 0) * slot.quantity,
+      0,
+    );
+    if (used + weight * delta > secureCapacityKg(loadout)) return;
+
+    if (existing) existing.quantity += delta;
+    else slots.push({ itemId, quantity: delta });
+  }
+
+  /** Surface what the settlement did beyond moving loot. */
+  private reportSettlement(report: SettlementReport): void {
+    for (const completion of report.questCompletions) {
+      this.ui.toast(`Auftrag abgeschlossen: ${completion.stage.name}`, 3200);
+    }
+    if (report.insuranceReturns.length > 0) {
+      this.ui.toast(
+        `Versicherung: ${report.insuranceReturns.length} Teile in ${report.insuranceMinutes} min zurück.`,
+        3200,
+      );
+    }
   }
 
   // ── Overlays ─────────────────────────────────────────────────────────────
@@ -579,6 +735,9 @@ export class Game {
             this.intent.dropItemId = itemId;
             this.intent.dropQuantity = quantity;
           },
+          onSecure: (itemId) => {
+            this.intent.secureItemId = itemId;
+          },
         },
       ),
     );
@@ -593,18 +752,35 @@ export class Game {
         onResume: () => this.closeOverlays(),
         onAbandon: () => {
           this.closeOverlays();
-          // Abandoning costs exactly what dying costs - no free exit.
-          this.lastReport = settleRaid(this.profile, {
-            kind: 'died',
-            durationSeconds: this.sim?.elapsedSeconds ?? 0,
-            kills: 0,
-            xp: 0,
-            lootValue: 0,
-            loot: [],
-            retainedShards: 0,
-            zoneName: null,
-            weaponCondition: this.profile.loadout.weaponCondition,
-          });
+          // Abandoning costs exactly what dying costs - no free exit. The
+          // secure container is the one exception, as it is everywhere else.
+          const sim = this.sim;
+          const player = sim?.world.playerEntity ?? null;
+          const secure =
+            player !== null ? (sim?.world.carriers.get(player)?.secure ?? null) : null;
+
+          this.lastReport = settleRaid(
+            this.profile,
+            {
+              kind: 'died',
+              durationSeconds: sim?.elapsedSeconds ?? 0,
+              kills: 0,
+              xp: 0,
+              lootValue: 0,
+              loot: [],
+              securedLoot: secure
+                ? secure.slots.map((slot) => ({ itemId: slot.itemId, quantity: slot.quantity }))
+                : [],
+              securedValue: 0,
+              vaultsOpened: 0,
+              anomaliesSurvived: 0,
+              retainedShards: 0,
+              zoneName: null,
+              weaponCondition: this.profile.loadout.weaponCondition,
+            },
+            Date.now(),
+          );
+          this.reportSettlement(this.lastReport);
           void this.saveProfile();
           this.states.transitionTo('result');
         },

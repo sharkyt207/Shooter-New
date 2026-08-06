@@ -3,7 +3,8 @@
  * PROJECT ECHO - browser smoke test.
  *
  * Drives the real game in a real browser through the whole loop:
- *   menu -> base -> loadout -> briefing -> raid -> move, shoot, light, inventory
+ *   menu -> base (all tabs) -> loadout -> briefing -> raid -> move, shoot,
+ *   light, inventory
  *
  * This is the single most valuable test a game can have. Unit tests prove the
  * simulation is correct; only this proves the thing actually starts, renders
@@ -78,6 +79,19 @@ try {
 
   console.log('  2/8 Basis');
   await shot('02-base');
+
+  // Every base tab renders different systems (traders, the craft queue, the
+  // build queue). A tab that throws is invisible to unit tests and fatal here.
+  for (const [tab, name] of [
+    ['Handel', '02b-trader'],
+    ['Werkbank', '02c-workbench'],
+    ['Basis', '02d-modules'],
+  ]) {
+    await clickButton(tab);
+    await shot(name);
+  }
+  await clickButton('Lager');
+
   await clickButton('Ausrüstung wählen');
 
   console.log('  3/8 Ausrüstung');
@@ -113,7 +127,11 @@ try {
   // raid happens to roll a dark weather, so the smoke test forces it on.
   console.log('  7/8 Licht');
   const lightBtn = page.locator('button[aria-label="Licht"]').first();
-  await lightBtn.click();
+  // The HUD redraws constantly under software rendering, and Playwright's
+  // stability wait occasionally loses the element mid-click. A forced click
+  // with a generous timeout keeps the check meaningful without making the
+  // smoke test flaky - a test people learn to ignore protects nothing.
+  await lightBtn.click({ force: true, timeout: 15000 });
   await page.waitForTimeout(500);
   await shot('09-light');
 

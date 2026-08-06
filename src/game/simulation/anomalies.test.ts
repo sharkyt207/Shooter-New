@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { ANOMALY } from '@/content/balance';
 import type { AnomalyKind } from '@/content/anomalies';
 import type { EntityId } from '@/core/ecs/entity';
-import type { Loadout } from '@/game/player/loadout';
+import { createEmptyLoadout, type Loadout } from '@/game/player/loadout';
 import { createIntent } from '@/game/player/playerIntent';
 import { RaidSimulation } from '@/game/simulation/raidSimulation';
 import { createAnomaly } from '@/game/simulation/factories';
@@ -18,6 +18,7 @@ import { avoidanceAt, fieldFactorAt } from './systems/anomalySystem';
 
 function loadout(): Loadout {
   return {
+    ...createEmptyLoadout(),
     weaponItemId: 'itm_wpn_splitter',
     armorItemId: null,
     helmetItemId: null,

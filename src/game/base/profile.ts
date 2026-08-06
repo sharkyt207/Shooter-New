@@ -7,9 +7,10 @@
  */
 
 import { ECONOMY } from '@/content/balance';
+import { SeededRandom } from '@/core/math/random';
 import { ALL_BASE_MODULE_IDS, findBaseModule, STARTING_MODULES } from '@/content/baseModules';
 import { createInventory, type InventoryState } from '@/game/inventory/inventory';
-import type { Loadout } from '@/game/player/loadout';
+import { createEmptyLoadout, type Loadout } from '@/game/player/loadout';
 
 export interface RaidStats {
   raidsStarted: number;
@@ -20,6 +21,47 @@ export interface RaidStats {
   /** Highest single-raid loot value extracted, in credits. */
   bestHaul: number;
   totalLootValue: number;
+}
+
+/** A module upgrade under construction. */
+export interface BuildJob {
+  moduleId: string;
+  targetLevel: number;
+  /** Epoch milliseconds at which the build completes. */
+  readyAt: number;
+}
+
+/** A queued crafting job. */
+export interface CraftJob {
+  id: number;
+  recipeId: string;
+  readyAt: number;
+  /**
+   * Outcome, rolled when the job starts rather than when it is collected.
+   * Rolling at collection time would let a reload re-roll a failed craft.
+   */
+  failed: boolean;
+}
+
+/** A contract currently on offer or in progress. */
+export interface ActiveContract {
+  templateId: string;
+  /** True once handed in; stays in the list until the offers refresh. */
+  completed: boolean;
+}
+
+/** Insured gear on its way back after a failed raid. */
+export interface InsuranceReturn {
+  itemId: string;
+  quantity: number;
+  readyAt: number;
+}
+
+export interface QuestProgress {
+  /** Index into QUEST_STAGES. Equal to the count when the line is finished. */
+  stage: number;
+  /** Progress towards the current stage's target. */
+  progress: number;
 }
 
 export interface PlayerProfile {
@@ -35,6 +77,34 @@ export interface PlayerProfile {
   /** How often the equipped weapon has been serviced; each repair lowers its ceiling. */
   weaponRepairs: number;
   stats: RaidStats;
+
+  // ── Meta (M5) ────────────────────────────────────────────────────────────
+
+  /**
+   * Cursor for every meta random roll.
+   *
+   * Meta randomness has to be *deterministic per profile* and must advance on
+   * every use. Otherwise reloading the save would re-roll a failed craft, and a
+   * system that can be save-scummed may as well not have a failure chance at
+   * all. `src/game/**` cannot call `Math.random()` anyway (ADR-009).
+   */
+  metaSeed: number;
+
+  /** Module upgrades under construction. */
+  builds: BuildJob[];
+  /** Crafting queue. */
+  crafts: CraftJob[];
+  /** Next craft job id. */
+  nextCraftId: number;
+  /** Trader id -> reputation points. */
+  reputation: Record<string, number>;
+  /** Contracts currently on offer. */
+  contracts: ActiveContract[];
+  /** Epoch ms the offers were last rolled. */
+  contractsRolledAt: number;
+  /** Insured gear in transit back to the base. */
+  insuranceReturns: InsuranceReturn[];
+  quest: QuestProgress;
 }
 
 /** Stash capacity granted by the current level of the stash module. */
@@ -58,6 +128,7 @@ export function createDefaultProfile(): PlayerProfile {
   ]);
 
   const loadout: Loadout = {
+    ...createEmptyLoadout(),
     weaponItemId: 'itm_wpn_splitter',
     armorItemId: 'itm_armor_fiber',
     helmetItemId: null,
@@ -89,7 +160,32 @@ export function createDefaultProfile(): PlayerProfile {
       bestHaul: 0,
       totalLootValue: 0,
     },
+    metaSeed: 1,
+    builds: [],
+    crafts: [],
+    nextCraftId: 1,
+    reputation: {},
+    contracts: [],
+    contractsRolledAt: 0,
+    insuranceReturns: [],
+    quest: { stage: 0, progress: 0 },
   };
+}
+
+/**
+ * Take the next deterministic random value from the profile, 0..1.
+ *
+ * Advancing the cursor on every draw is the whole point: a failed craft cannot
+ * be re-rolled by reloading the save.
+ */
+export function nextMetaRandom(profile: PlayerProfile): number {
+  profile.metaSeed = (profile.metaSeed + 1) >>> 0;
+  return new SeededRandom(profile.metaSeed).float();
+}
+
+/** A throwaway stream seeded from a stable value - used for offer rolls. */
+export function metaStream(seed: number): SeededRandom {
+  return new SeededRandom(seed >>> 0);
 }
 
 /** Total experience required to reach `level`. */
@@ -129,12 +225,6 @@ export function moduleLevel(profile: Readonly<PlayerProfile>, moduleId: string):
   return profile.modules[moduleId] ?? 0;
 }
 
-export interface UpgradeResult {
-  ok: boolean;
-  reason?: 'maxLevel' | 'notEnoughCredits' | 'unknownModule';
-  newLevel?: number;
-}
-
 /** Cost of the next level of a module, or null when it is already maxed. */
 export function nextUpgradeCost(profile: Readonly<PlayerProfile>, moduleId: string): number | null {
   const def = findBaseModule(moduleId);
@@ -142,26 +232,6 @@ export function nextUpgradeCost(profile: Readonly<PlayerProfile>, moduleId: stri
   const current = moduleLevel(profile, moduleId);
   const next = def.levels.find((l) => l.level === current + 1);
   return next ? next.costCredits : null;
-}
-
-export function upgradeModule(profile: PlayerProfile, moduleId: string): UpgradeResult {
-  const def = findBaseModule(moduleId);
-  if (!def) return { ok: false, reason: 'unknownModule' };
-
-  const current = moduleLevel(profile, moduleId);
-  const next = def.levels.find((l) => l.level === current + 1);
-  if (!next) return { ok: false, reason: 'maxLevel' };
-  if (profile.credits < next.costCredits) return { ok: false, reason: 'notEnoughCredits' };
-
-  profile.credits -= next.costCredits;
-  profile.modules[moduleId] = next.level;
-
-  // Upgrading the stash immediately widens the capacity limit.
-  if (moduleId === 'base_stash') {
-    profile.stash.capacityKg = stashCapacityFor(profile.modules);
-  }
-
-  return { ok: true, newLevel: next.level };
 }
 
 /** Every module the player could interact with, built or not. */

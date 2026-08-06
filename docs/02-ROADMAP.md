@@ -16,8 +16,8 @@ erst dann das nächste. Kein paralleles Anfangen von Baustellen.
 | **M2** | Kampf & Waffen in Tiefe | Munitionstypen, Panzerungsklassen, Trefferzonen, Aufsätze, Wurfgeschosse, Nahkampf | ✅ abgeschlossen |
 | **M3** | Gegner & KI in Tiefe | Flow-Field-Navigation, Fraktionskrieg, Squads, Wächter-Boss | ✅ abgeschlossen |
 | **M4** | Welt & Anomalien | Fragment-Generator v2, alle 5 Anomalien, Wetter/Licht | ✅ fertig |
-| **M5** | Meta: Basis, Crafting, Economy | Basisausbau, Werkbänke, Händler, Schwarzmarkt | 🔜 als nächstes |
-| **M6** | Mobile-Härtung | Capacitor, iOS-Build, Performance-Pass, Touch-Politur | ⏳ geplant |
+| **M5** | Meta: Basis, Crafting, Economy | Basisausbau, Werkbänke, Händler, Schwarzmarkt | ✅ fertig |
+| **M6** | Mobile-Härtung | Capacitor, iOS-Build, Performance-Pass, Touch-Politur | 🔜 als nächstes |
 | **M7** | Content & Art-Pass | Finale Assets, Audio, Onboarding, Lokalisierung | ⏳ geplant |
 | **M8** | Live-Vorbereitung | Telemetrie, Balancing-Tools, optional PvP-Modul, Store-Release | ⏳ geplant |
 
@@ -149,16 +149,43 @@ zu sein.
 
 **Doku:** `docs/modules/map.md`, `docs/modules/anomalies.md`
 
-## M5 — Meta-Progression (nächster Schritt)
+## M5 — Meta-Progression ✅
 
-- Basisausbau: Lager, Werkbank, Medizin, Forschung, Waffenwerkstatt, Händler, Schwarzmarkt
-- Ausbaustufen mit Kosten, Bauzeit und Freischaltungen
-- Crafting mit Rezepten, Zeit und Fehlschlagchance
-- Händler-Tiers, Ruf, dynamische Preise, Aufträge
-- Versicherung, Sichere Container, Questlinie „Kartographie der Risse"
-- **Doku:** `docs/modules/base.md`, `docs/modules/economy.md`, `docs/modules/crafting.md`
+**Ziel:** Der Loot bekommt ein Ziel jenseits des nächsten Raids.
 
-## M6 — Mobile-Härtung
+| Feature | Umfang |
+|---------|--------|
+| Basisausbau | 7 Module: Lager, Werkbank, Händler, Medizin, Forschung, **Waffenwerkstatt**, **Schwarzmarkt** |
+| Bauzeiten | Sofort bezahlt, später fertig; die Uhr läuft **während des Raids** weiter |
+| Modulabhängigkeiten | Waffenwerkstatt ← Werkbank 2, Schwarzmarkt ← Händler 3, Forschung ← Werkbank 2 — fehlende Voraussetzungen werden benannt |
+| Crafting-Warteschlange | Zeit, Fehlschlagquote (mit 60 % Materialrückgabe), Slots pro Werkbankstufe, 8 Rezepte |
+| Drei Händler | Quartiermeister, Feldärztin (Medizin-Aufschlag, kauft keine Waffen), Schwarzmarkt (kauft alles, verkauft teuer) |
+| Ruf | Pro Händler, durch Handelsvolumen und Aufträge; bessere Preise und tieferes Sortiment |
+| Aufträge | 3 Angebote, alle 8 h neu, deterministisch pro Zeitfenster, laufen nie ab |
+| Versicherung | Prämie beim Betreten, Rückgabe nach Verzögerung, nur Getragenes, nie sicher |
+| Sicherer Behälter | Überlebt jeden Ausgang, 2,5 kg, „Sichern"-Taste im Raid-Inventar |
+| Questlinie | „Kartographie der Risse", 7 Stufen, gespeist ausschließlich aus `RaidOutcome` |
+| Speicherstand | v1 → v2 migriert verlustfrei; Warteschlangen mit gelöschtem Inhalt werden verworfen |
+
+**Gefundene und behobene Fehler dieses Meilensteins**
+
+- **Gelddruckmaschine.** Der Kategorie-Aufschlag der Feldärztin galt nur beim
+  Ankauf: Bei hohem Ruf zahlte sie 51 für einen Verband, den sie für 48
+  verkaufte. Gefunden von dem Test, der die Preisrichtung über *jeden* Händler,
+  *jede* Ruf-Stufe und *jede* Modulstufe prüft. Der Aufschlag gilt jetzt auf
+  beiden Seiten.
+- **Unsichtbare Modulnamen.** `<button>` erbt keine Farbe vom Container, sondern
+  bekommt vom Browser `buttontext` — auf dunklem Grund praktisch schwarz. Jedes
+  andere Label im Modul-Kärtchen setzt seine eigene Farbe, also war ausgerechnet
+  der *Name* unsichtbar. Der Fehler war seit M1 drin und fiel erst auf, als der
+  Browser-Smoke-Test den Basis-Tab erstmals fotografierte.
+- **Ruf zu langsam.** Die erste Kalibrierung hätte für die dritte Rufstufe rund
+  215.000 Credits Handelsvolumen verlangt. Gegen einen echten Raid gerechnet und
+  auf ein Vielfaches davon korrigiert.
+
+**Doku:** `docs/modules/base.md`, `docs/modules/economy.md`, `docs/modules/crafting.md`
+
+## M6 — Mobile-Härtung (nächster Schritt)
 
 - Capacitor-Integration, iOS-Projekt, Signierung, TestFlight
 - Performance-Pass gegen das Budget aus `01-ARCHITECTURE.md` §8

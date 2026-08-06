@@ -317,6 +317,37 @@ export const ITEMS = {
     capacityKg: 38,
   },
 
+  // ── Sichere Behälter ─────────────────────────────────────────────────────
+  //
+  // The single most beloved object in the genre, and the reason a bad raid is
+  // survivable: whatever fits in here comes home even when you do not. It is
+  // deliberately tiny. A secure container that holds a raid's worth of loot
+  // would remove the decision it exists to create.
+  itm_case_small: {
+    id: 'itm_case_small',
+    name: 'Sicherungskassette',
+    description: 'Riss-stabilisiert. Was hier drin liegt, kommt zurück - auch ohne dich.',
+    category: 'container',
+    rarity: 'rare',
+    weight: 0.6,
+    value: 5200,
+    stackSize: 1,
+    icon: 'icon.item.case_small',
+    capacityKg: 2.5,
+  },
+  itm_case_large: {
+    id: 'itm_case_large',
+    name: 'Bergungskassette',
+    description: 'Größer, schwerer, und die Fraktionen töten dafür.',
+    category: 'container',
+    rarity: 'epic',
+    weight: 1.4,
+    value: 17000,
+    stackSize: 1,
+    icon: 'icon.item.case_large',
+    capacityKg: 5,
+  },
+
   // ── Attachments ──────────────────────────────────────────────────────────
   itm_att_barrel_long: {
     id: 'itm_att_barrel_long',

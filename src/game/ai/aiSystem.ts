@@ -481,6 +481,7 @@ function tryThrowGrenade(
   if (!carrier) {
     ctx.world.carriers.set(entity, {
       inventory: { slots: [{ itemId: def.throwableItemId, quantity: 1 }], capacityKg: 99 },
+      secure: null,
     });
   }
 

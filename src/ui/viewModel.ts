@@ -98,6 +98,12 @@ export interface HudViewModel {
   consumables: HudItem[];
   /** Throwables, surfaced as their own HUD buttons. */
   throwables: HudItem[];
+
+  /** Contents of the secure container, when one is carried. */
+  secureItems: HudItem[];
+  secureWeight: number;
+  secureCapacity: number;
+  hasSecure: boolean;
 }
 
 const EMPTY: HudViewModel = {
@@ -139,6 +145,10 @@ const EMPTY: HudViewModel = {
   inventory: [],
   consumables: [],
   throwables: [],
+  secureItems: [],
+  secureWeight: 0,
+  secureCapacity: 0,
+  hasSecure: false,
 };
 
 export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
@@ -235,6 +245,11 @@ export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
     throwables: inventory
       ? mergeHudItems(toHudItems(inventory.slots).filter((item) => item.category === 'throwable'))
       : [],
+
+    secureItems: carrier?.secure ? mergeHudItems(toHudItems(carrier.secure.slots)) : [],
+    secureWeight: carrier?.secure ? totalWeight(carrier.secure) : 0,
+    secureCapacity: carrier?.secure?.capacityKg ?? 0,
+    hasSecure: carrier?.secure !== null && carrier?.secure !== undefined,
   };
 }
 

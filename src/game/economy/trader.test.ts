@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { addItem, countItem } from '@/game/inventory/inventory';
-import { createDefaultProfile, levelFromXp, upgradeModule, xpForLevel } from '@/game/base/profile';
-import { craft } from '@/game/crafting/crafting';
+import { createDefaultProfile, levelFromXp, xpForLevel } from '@/game/base/profile';
+import { collectBuilds, startUpgrade } from '@/game/base/buildQueue';
+import { collectCrafts, startCraft } from '@/game/crafting/craftQueue';
 import type { RaidOutcome } from '@/game/gameEvents';
 import { buyItem, commitLoadout, sellItem, settleRaid } from './trader';
+
+const NOW = 1_700_000_000_000;
 
 function outcome(partial: Partial<RaidOutcome> = {}): RaidOutcome {
   return {
@@ -13,6 +16,10 @@ function outcome(partial: Partial<RaidOutcome> = {}): RaidOutcome {
     xp: 200,
     lootValue: 1500,
     loot: [{ itemId: 'itm_echoshard', quantity: 2 }],
+    securedLoot: [],
+    securedValue: 0,
+    vaultsOpened: 0,
+    anomaliesSurvived: 0,
     retainedShards: 0,
     zoneName: 'Nahtzone Nord',
     weaponCondition: 1,
@@ -94,20 +101,30 @@ describe('loadout commitment', () => {
 describe('raid settlement', () => {
   it('moves loot into the stash and awards xp on extraction', () => {
     const profile = createDefaultProfile();
-    const report = settleRaid(profile, outcome());
+    const report = settleRaid(profile, outcome(), NOW);
 
     expect(countItem(profile.stash, 'itm_echoshard')).toBe(2);
-    expect(profile.xp).toBe(200);
     expect(profile.stats.extractions).toBe(1);
     expect(profile.stats.bestHaul).toBe(1500);
     expect(report.overflow).toHaveLength(0);
+
+    // The first extraction also finishes the opening quest stage, so the XP is
+    // the raid's plus the stage's - checked explicitly rather than hard-coded,
+    // because that link is the point of the quest line.
+    const stageXp = report.questCompletions.reduce((sum, entry) => sum + entry.xp, 0);
+    expect(report.questCompletions).toHaveLength(1);
+    expect(profile.xp).toBe(200 + stageXp);
   });
 
   it('reports overflow instead of silently dropping loot', () => {
     const profile = createDefaultProfile();
     profile.stash.capacityKg = 0.01;
 
-    const report = settleRaid(profile, outcome({ loot: [{ itemId: 'itm_armor_plate', quantity: 1 }] }));
+    const report = settleRaid(
+      profile,
+      outcome({ loot: [{ itemId: 'itm_armor_plate', quantity: 1 }] }),
+      NOW,
+    );
 
     expect(report.overflow).toEqual([{ itemId: 'itm_armor_plate', quantity: 1 }]);
   });
@@ -117,6 +134,7 @@ describe('raid settlement', () => {
     settleRaid(
       profile,
       outcome({ kind: 'died', loot: [], lootValue: 0, retainedShards: 3, xp: 40 }),
+      NOW,
     );
 
     expect(profile.echoShards).toBe(3);
@@ -144,18 +162,21 @@ describe('progression', () => {
     profile.credits = 100000;
     const capacityBefore = profile.stash.capacityKg;
 
-    const result = upgradeModule(profile, 'base_stash');
-
+    const result = startUpgrade(profile, 'base_stash', NOW);
     expect(result.ok).toBe(true);
-    expect(result.newLevel).toBe(2);
     expect(profile.credits).toBeLessThan(100000);
+
+    // Level 2 of the stash takes time, so the capacity only widens on collect.
+    expect(profile.stash.capacityKg).toBe(capacityBefore);
+    collectBuilds(profile, NOW + 3_600_000);
+    expect(profile.modules['base_stash']).toBe(2);
     expect(profile.stash.capacityKg).toBeGreaterThan(capacityBefore);
   });
 
   it('refuses an upgrade the player cannot afford', () => {
     const profile = createDefaultProfile();
     profile.credits = 0;
-    expect(upgradeModule(profile, 'base_stash').reason).toBe('notEnoughCredits');
+    expect(startUpgrade(profile, 'base_stash', NOW).reason).toBe('notEnoughCredits');
   });
 });
 
@@ -166,16 +187,20 @@ describe('crafting', () => {
     addItem(profile.stash, 'itm_copper', 2);
 
     const before = countItem(profile.stash, 'itm_ammo_9mm');
-    const result = craft(profile, 'rcp_ammo_9mm');
+    const result = startCraft(profile, 'rcp_ammo_9mm', NOW);
 
     expect(result.ok).toBe(true);
-    expect(countItem(profile.stash, 'itm_ammo_9mm')).toBe(before + 30);
+    // Inputs go immediately; the output waits for the timer.
     expect(countItem(profile.stash, 'itm_scrap')).toBe(2);
+    expect(countItem(profile.stash, 'itm_ammo_9mm')).toBe(before);
+
+    collectCrafts(profile, NOW + 3_600_000);
+    expect(countItem(profile.stash, 'itm_ammo_9mm')).toBe(before + 30);
   });
 
   it('refuses without inputs and consumes nothing', () => {
     const profile = createDefaultProfile();
-    const result = craft(profile, 'rcp_ammo_9mm');
+    const result = startCraft(profile, 'rcp_ammo_9mm', NOW);
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('missingInputs');
   });
@@ -186,9 +211,9 @@ describe('crafting', () => {
     addItem(profile.stash, 'itm_copper', 10);
     addItem(profile.stash, 'itm_circuit', 10);
 
-    expect(craft(profile, 'rcp_ammo_74').reason).toBe('moduleTooLow');
+    expect(startCraft(profile, 'rcp_ammo_74', NOW).reason).toBe('moduleTooLow');
 
     profile.modules['base_workbench'] = 2;
-    expect(craft(profile, 'rcp_ammo_74').ok).toBe(true);
+    expect(startCraft(profile, 'rcp_ammo_74', NOW).ok).toBe(true);
   });
 });

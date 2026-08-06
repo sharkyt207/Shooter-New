@@ -11,10 +11,20 @@ import { findItem } from '@/content/items';
 import { weaponForItem } from '@/content/weapons';
 import { countItem } from '@/game/inventory/inventory';
 import type { PlayerProfile } from '@/game/base/profile';
-import { equippedWeightKg, loadoutCapacityKg, loadoutValue, loadoutWeightKg } from '@/game/player/loadout';
+import { META } from '@/content/balance';
+import {
+  equippedWeightKg,
+  loadoutCapacityKg,
+  loadoutValue,
+  loadoutWeightKg,
+  secureCapacityKg,
+} from '@/game/player/loadout';
+import { insuranceAvailable, premiumFor, returnMinutes } from '@/game/economy/insurance';
 import { mergeHudItems, toHudItems, type HudItem } from '@/ui/viewModel';
 import { bar, clear, el, formatCredits, formatWeight } from '@/ui/components/dom';
 import type { Screen } from '@/ui/uiRoot';
+
+const INSURANCE_CHANCE = META.insuranceReturnChance;
 
 export interface LoadoutCallbacks {
   onBack(): void;
@@ -25,6 +35,12 @@ export interface LoadoutCallbacks {
   /** Choose which round to chamber. */
   onSelectAmmo(itemId: string | null): void;
   onOpenWorkshop(): void;
+  /** Equip or remove the secure container. */
+  onEquipSecure(itemId: string | null): void;
+  /** Move an item into or out of the secure container. */
+  onSecureChange(itemId: string, delta: number): void;
+  /** Buy or cancel insurance for this raid. */
+  onToggleInsurance(): void;
 }
 
 export function createLoadoutScreen(profile: PlayerProfile, callbacks: LoadoutCallbacks): Screen {
@@ -60,6 +76,19 @@ export function createLoadoutScreen(profile: PlayerProfile, callbacks: LoadoutCa
       slotPanel('Rucksack', 'backpack', profile.loadout.backpackItemId, owned.filter((i) => i.category === 'backpack'), callbacks),
     );
     content.appendChild(carryPanel(profile, owned, callbacks));
+    content.appendChild(
+      slotPanel(
+        'Sicherer Behälter',
+        'secure',
+        profile.loadout.secureContainerItemId,
+        owned.filter((i) => i.category === 'container'),
+        callbacks,
+      ),
+    );
+    if (profile.loadout.secureContainerItemId) {
+      content.appendChild(securePanel(profile, owned, callbacks));
+    }
+    content.appendChild(insurancePanel(profile, callbacks));
 
     const value = loadoutValue(profile.loadout);
     const weight = loadoutWeightKg(profile.loadout);
@@ -183,17 +212,21 @@ function ammoPanel(
 
 function slotPanel(
   title: string,
-  slot: 'weapon' | 'armor' | 'helmet' | 'backpack',
+  slot: 'weapon' | 'armor' | 'helmet' | 'backpack' | 'secure',
   equippedId: string | null,
   options: HudItem[],
   callbacks: LoadoutCallbacks,
 ): HTMLElement {
+  const equip = (itemId: string | null): void => {
+    if (slot === 'secure') callbacks.onEquipSecure(itemId);
+    else callbacks.onEquip(slot, itemId);
+  };
   const list = el('div', { className: 'item-list' });
 
   list.appendChild(
     el('div', {
       className: `item${equippedId === null ? ' item--selected' : ''}`,
-      onClick: () => callbacks.onEquip(slot, null),
+      onClick: () => equip(null),
       children: [el('div', { className: 'item__name muted', text: '— nichts —' })],
     }),
   );
@@ -203,7 +236,7 @@ function slotPanel(
       el('div', {
         className: `item${equippedId === option.itemId ? ' item--selected' : ''}`,
         data: { rarity: option.rarity },
-        onClick: () => callbacks.onEquip(slot, option.itemId),
+        onClick: () => equip(option.itemId),
         children: [
           el('div', { className: 'item__name', text: option.name }),
           el('div', { className: 'item__meta', text: describeItem(option.itemId) }),
@@ -262,6 +295,125 @@ function carryPanel(
   return el('div', {
     className: 'panel',
     children: [el('div', { className: 'panel__title', text: 'Mitnehmen' }), list],
+  });
+}
+
+/**
+ * The secure container's contents.
+ *
+ * Everything in here comes home whatever happens, which makes this the highest-
+ * stakes list on the screen. It gets its own panel and its own weight readout,
+ * because the limit is what turns it into a decision rather than a free win.
+ */
+function securePanel(
+  profile: PlayerProfile,
+  owned: HudItem[],
+  callbacks: LoadoutCallbacks,
+): HTMLElement {
+  const capacity = secureCapacityKg(profile.loadout);
+  const used = profile.loadout.secureItems.reduce(
+    (sum, slot) => sum + (findItem(slot.itemId)?.weight ?? 0) * slot.quantity,
+    0,
+  );
+
+  const list = el('div', { className: 'item-list' });
+  const packable = owned.filter((item) => item.category !== 'container');
+
+  if (packable.length === 0) {
+    list.appendChild(el('div', { className: 'muted', text: 'Nichts im Lager.' }));
+  }
+
+  for (const item of packable) {
+    const inside = profile.loadout.secureItems
+      .filter((slot) => slot.itemId === item.itemId)
+      .reduce((sum, slot) => sum + slot.quantity, 0);
+    if (inside === 0 && (findItem(item.itemId)?.weight ?? 0) > capacity - used) continue;
+
+    list.appendChild(
+      el('div', {
+        className: 'item',
+        data: { rarity: item.rarity },
+        children: [
+          el('div', {
+            className: 'grow',
+            children: [
+              el('div', { className: 'item__name', text: item.name }),
+              el('div', { className: 'item__meta', text: formatWeight(findItem(item.itemId)?.weight ?? 0) }),
+            ],
+          }),
+          stepper('−', () => callbacks.onSecureChange(item.itemId, -1)),
+          el('div', {
+            className: 'item__meta mono',
+            style: { minWidth: '2.5rem', textAlign: 'center' },
+            text: String(inside),
+          }),
+          stepper('+', () => callbacks.onSecureChange(item.itemId, 1)),
+        ],
+      }),
+    );
+  }
+
+  return el('div', {
+    className: 'panel',
+    style: { borderColor: 'var(--color-extraction)' },
+    children: [
+      el('div', {
+        className: 'row row--between',
+        children: [
+          el('div', { className: 'panel__title', text: 'Im sicheren Behälter' }),
+          el('div', {
+            className: 'muted mono',
+            text: `${formatWeight(used)} / ${formatWeight(capacity)}`,
+          }),
+        ],
+      }),
+      el('div', { className: 'muted', text: 'Kommt zurück - auch wenn du es nicht tust.' }),
+      list,
+    ],
+  });
+}
+
+/**
+ * Insurance.
+ *
+ * Deliberately a single toggle with the price on it. Anything more elaborate
+ * would turn a gut decision made in ten seconds into paperwork.
+ */
+function insurancePanel(profile: PlayerProfile, callbacks: LoadoutCallbacks): HTMLElement {
+  if (!insuranceAvailable(profile)) {
+    return el('div', {
+      className: 'panel',
+      children: [
+        el('div', { className: 'panel__title', text: 'Versicherung' }),
+        el('div', { className: 'muted', text: 'Braucht das Modul Medizin.' }),
+      ],
+    });
+  }
+
+  const premium = premiumFor(profile, profile.loadout);
+  const affordable = profile.credits >= premium;
+  const active = profile.loadout.insured;
+
+  const button = el('button', {
+    className: `btn ${active ? 'btn--primary' : 'btn--ghost'} btn--block`,
+    text: active ? `Versichert · ${formatCredits(premium)}` : `Versichern · ${formatCredits(premium)}`,
+    onClick: () => callbacks.onToggleInsurance(),
+  });
+  button.disabled = !active && !affordable;
+
+  return el('div', {
+    className: 'panel',
+    children: [
+      el('div', { className: 'panel__title', text: 'Versicherung' }),
+      el('div', {
+        className: 'muted',
+        text: `Getragene Ausrüstung kommt bei einem Fehlschlag mit ${Math.round(
+          INSURANCE_CHANCE * 100,
+        )} % Wahrscheinlichkeit nach ${returnMinutes(profile)} Minuten zurück. Beute nie.`,
+      }),
+      el('div', { style: { height: 'var(--space-2)' } }),
+      button,
+    ],
   });
 }
 

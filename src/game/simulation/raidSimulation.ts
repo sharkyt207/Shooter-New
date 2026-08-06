@@ -80,6 +80,10 @@ export class RaidSimulation {
 
   private currentTick = 0;
   private finishedOutcome: RaidOutcome | null = null;
+  /** Locked rooms the player forced open. Reported to the quest line. */
+  private vaultsOpened = 0;
+  /** Anomalies the player entered; only counted as survived if they get out. */
+  private anomaliesEntered = 0;
   /** Ticks the death animation is allowed to play before the raid resolves. */
   private deathDelayTicks = -1;
   private lastTimeWarning = -1;
@@ -164,6 +168,15 @@ export class RaidSimulation {
   }
 
   start(): void {
+    // Counted here rather than in a system: these are facts *about the raid*,
+    // not state any system needs, and the meta layer is their only consumer.
+    this.bus.on('door:opened', (event) => {
+      if (event.wasLocked) this.vaultsOpened++;
+    });
+    this.bus.on('anomaly:entered', () => {
+      this.anomaliesEntered++;
+    });
+
     this.bus.emit('raid:started', {
       seed: this.seed,
       durationSeconds: this.durationTicks / 60,
@@ -370,6 +383,15 @@ export class RaidSimulation {
       : [];
     const lootValue = extracted && carrier ? totalValue(carrier.inventory) : 0;
 
+    // The secure container comes home whatever happened to its owner. That is
+    // the whole reason it exists, so it is deliberately outside the `extracted`
+    // branch above.
+    const secure = carrier?.secure ?? null;
+    const securedLoot = secure
+      ? secure.slots.map((slot) => ({ itemId: slot.itemId, quantity: slot.quantity }))
+      : [];
+    const securedValue = secure ? totalValue(secure) : 0;
+
     // Echo shards survive death, so even a failed raid moves the meta forward
     // (Pillar P5).
     const carriedShards = carrier
@@ -401,6 +423,11 @@ export class RaidSimulation {
       xp,
       lootValue,
       loot,
+      securedLoot,
+      securedValue,
+      vaultsOpened: this.vaultsOpened,
+      // Only survivors get the credit: an anomaly you died in was not survived.
+      anomaliesSurvived: kind === 'died' ? 0 : this.anomaliesEntered,
       retainedShards,
       zoneName: this.ctx.extractedZoneName,
       weaponCondition,

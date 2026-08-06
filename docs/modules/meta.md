@@ -1,12 +1,17 @@
-# Module: game/save, game/base, game/economy, game/crafting
+# Modul: game/save
 
-> Schicht 2 · Status 🟡 Grundgerüst (Vertiefung in M5)
+> Schicht 2 · Status 🟢 M5 abgeschlossen
 
 ## Zweck
 
-Alles zwischen den Raids: Profil, Lager, Händler, Basisausbau, Crafting,
-Persistenz. Das ist die Gegenkraft zur Härte des Raids — der Grund, warum sich
-ein Verlust nicht wie Zeitverschwendung anfühlt (Pillar P5).
+Persistenz. Die übrigen Meta-Systeme haben seit M5 eigene Dokumente:
+
+- [base.md](base.md) — Profil, Modulausbau, Bauzeiten, Questlinie
+- [economy.md](economy.md) — Händler, Ruf, Aufträge, Versicherung, Abrechnung
+- [crafting.md](crafting.md) — Werkbank, Zeit, Fehlschlagquote
+
+Zusammen sind sie die Gegenkraft zur Härte des Raids — der Grund, warum sich ein
+Verlust nicht wie Zeitverschwendung anfühlt (Pillar P5).
 
 ## Speichersystem
 
@@ -21,6 +26,12 @@ Drei Schutzebenen:
 
 1. **Migrationskette** — `v0 → v1 → v2 …`, ein Schritt je Version. Neue Schritte
    kommen dazu, bestehende werden nie verändert.
+
+   M5 hat die erste echte Migration gebracht (`v1 → v2`, die Meta-Schicht). Sie
+   ist eine Zeile: Jedes neue Feld hat einen sicheren Leer-Default, den die
+   Validierung ohnehin einsetzt. Ein v1-Speicherstand behält Lager, Credits,
+   Statistik und Loadout vollständig und bekommt eine frische Basis dazu —
+   genau das, was eine Basis ist, die diese Systeme noch nie benutzt hat.
 2. **Validierung** — jedes Feld wird geprüft und repariert. Unbekannte Items
    (aus einem Patch entfernt) werden verworfen, der Rest des Profils bleibt.
 3. **Fallback** — unparsbare Daten ergeben ein frisches Profil plus Hinweis.
@@ -29,38 +40,16 @@ Drei Schutzebenen:
 Die Simulation besitzt keine Uhr (`Date.now()` ist in `src/game/**` verboten) —
 der Zeitstempel wird von außen übergeben.
 
-## Profil
+## Was gespeichert wird
 
-```ts
-interface PlayerProfile {
-  credits, xp, level, echoShards,
-  stash: InventoryState,      // überlebt jeden Tod
-  loadout: Loadout,           // was in den nächsten Raid geht
-  modules: Record<string, number>,
-  stats: RaidStats,
-}
-```
+Das gesamte `PlayerProfile` — Lager, Loadout, Module, Statistik und seit M5 die
+Meta-Warteschlangen (siehe [base.md](base.md)). Ausschließlich JSON-sichere
+Daten, ohne Klasseninstanzen: eine direkte Folge davon, dass Komponenten reine
+Daten sind (ADR-002).
 
-XP-Kurve: `base × level^1.35`, kumulativ. Level ergibt sich immer aus XP, ist
-also nie inkonsistent.
-
-## Ökonomie
-
-**Die Ausrüstung verlässt das Lager beim Betreten des Risses**, nicht erst beim
-Tod (`commitLoadout`). Damit ist das Risiko unmissverständlich: Ab diesem Moment
-ist das Zeug weg aus dem Bestand. `commitLoadout` prüft erst alles und entfernt
-dann — ein Teil-Commit würde still Gegenstände vernichten.
-
-| Regel | Wert |
-|-------|------|
-| Ankauf durch den Händler | 55 % des Wertes, +8 %/Händlerstufe |
-| Verkauf an den Spieler | 135 % des Wertes, −7 %/Händlerstufe |
-
-Ein Test erzwingt, dass Kaufpreis > Verkaufspreis bleibt — sonst wäre der
-Händler eine Gelddruckmaschine.
-
-`settleRaid` meldet **Overflow** statt Beute still zu verschlucken: Was nicht
-mehr ins Lager passt, wird im Ergebnisbildschirm aufgeführt.
+Zeitstempel sind Epoch-Millisekunden von außen. `game/**` besitzt keine Uhr, und
+`Date.now()` ist dort verboten (ADR-009) — was nebenbei dafür sorgt, dass
+Bau- und Fertigungszeiten einen Neustart unbeschadet überstehen.
 
 ## Anti-Softlock
 
@@ -70,26 +59,23 @@ gibt die Basis kostenlos eine Notausrüstung aus.
 Alles zu verlieren ist der Sinn des Genres. Danach nicht mehr spielen zu können,
 ist es nicht.
 
-## Crafting
+## Validierung inhaltsabhängiger Daten
 
-Rezepte sind an Basismodul und -stufe gebunden. `craft` prüft *zuerst*, ob das
-Ergebnis ins Lager passt, und verbraucht erst dann Material — ein volles Lager
-darf keine Rohstoffe vernichten.
+Warteschlangen verweisen auf Inhalte, die ein Patch entfernen kann. Ein Bau für
+ein gelöschtes Modul wird **verworfen**, nicht repariert: Die Credits sind so
+oder so weg, aber ein Phantomauftrag würde den Slot für immer blockieren.
+Dasselbe gilt für Rezepte, Händler-Ruf und Aufträge.
 
 ## Tests
 
 `saveSystem.test.ts`: Roundtrip, fehlender Speicherstand, unparsbare Daten,
 unversionierter Altstand, Speicherstand aus der Zukunft, unbekannte Items,
-kaputte Slot-Einträge, Loadout mit fehlenden Gegenständen.
+kaputte Slot-Einträge, Loadout mit fehlenden Gegenständen, **Migration v1 → v2
+ohne Verlust** und das Verwerfen von Warteschlangen-Einträgen, deren Inhalt es
+nicht mehr gibt.
 
-`trader.test.ts`: Kaufen/Verkaufen, Preisrichtung, Loadout-Commit (inkl.
-fehlschlagen ohne Schaden), Abrechnung mit Overflow, Tod mit geretteten
-Splittern, XP-Kurve, Modul-Ausbau, Crafting mit Modulsperre.
+## Offen / nächster Schritt
 
-## Offen / nächster Schritt (M5)
-
-- Bauzeiten und Modulabhängigkeiten
-- Händler-Tiers, Ruf, dynamische Preise, Aufträge
-- Schwarzmarkt
-- Versicherung und sicherer Container
-- Questlinie „Kartographie der Risse"
+- Cloud-Sync (frühestens M8, braucht Konflikt-Auflösung)
+- Mehrere Speicherplätze — bewusst zurückgestellt, ein Extraction-Shooter hat
+  genau ein Profil

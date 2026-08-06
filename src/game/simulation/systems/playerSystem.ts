@@ -10,7 +10,7 @@ import { approachAngle, clamp, clamp01, DEG_TO_RAD, remap } from '@/core/math/sc
 import { applyHealing } from '@/game/combat/damage';
 import { meleeAttack } from '@/game/combat/melee';
 import { throwItem } from '@/game/combat/throwables';
-import { loadFraction, removeItem } from '@/game/inventory/inventory';
+import { addItem, loadFraction, removeItem } from '@/game/inventory/inventory';
 import { createLootDrop } from '@/game/simulation/factories';
 import { moveCircle } from '@/game/simulation/collision';
 import { emitNoise, type SimContext } from '@/game/simulation/simContext';
@@ -119,6 +119,32 @@ export function playerSystem(ctx: SimContext): void {
         weight: loadFraction(carrier.inventory) * carrier.inventory.capacityKg,
         capacity: carrier.inventory.capacityKg,
       });
+    }
+  }
+
+  // ── Secure container ─────────────────────────────────────────────────────
+  // Moving an item in here is the single most consequential inventory action in
+  // the game: it decides what survives if the raid goes wrong.
+  if (intent.secureItemId) {
+    const secure = carrier.secure;
+    if (secure) {
+      const itemId = intent.secureItemId;
+      const moved = removeItem(carrier.inventory, itemId, 1);
+      if (moved > 0) {
+        const stored = addItem(secure, itemId, moved);
+        if (stored < moved) {
+          // Would not fit: put it straight back, never destroy it.
+          addItem(carrier.inventory, itemId, moved - stored);
+          ctx.bus.emit('loot:rejected', { itemId, reason: 'secureFull' });
+        }
+        if (stored > 0) {
+          ctx.bus.emit('loot:secured', { itemId, quantity: stored });
+          ctx.bus.emit('player:weightChanged', {
+            weight: loadFraction(carrier.inventory) * carrier.inventory.capacityKg,
+            capacity: carrier.inventory.capacityKg,
+          });
+        }
+      }
     }
   }
 

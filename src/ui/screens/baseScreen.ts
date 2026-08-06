@@ -1,22 +1,44 @@
 /**
  * The operations base.
  *
- * Everything between raids happens here: the stash, the workbench, the trader
- * and the base upgrades. This is where a raid's outcome turns into lasting
- * progress - the counterweight that makes the risk worth taking (Pillar P5).
+ * Everything between raids happens here: the stash, the traders, the workbench
+ * and the base itself. This is where a raid's outcome turns into lasting
+ * progress — the counterweight that makes the risk worth taking (Pillar P5).
+ *
+ * The screen shows time. Builds and crafts run on wall-clock timers that keep
+ * ticking during a raid, so every panel takes `now` and the state machine
+ * re-renders it on a slow tick. Nothing here polls the profile; it is handed a
+ * snapshot and draws it.
  */
 
-import { findBaseModule } from '@/content/baseModules';
+import { findBaseModule, ALL_BASE_MODULE_IDS } from '@/content/baseModules';
+import { QUEST_LINE_NAME } from '@/content/quests';
+import { findTrader } from '@/content/traders';
 import { totalWeight } from '@/game/inventory/inventory';
+import {
+  buildJobFor,
+  buildProgress,
+  nextLevelOf,
+  secondsRemaining,
+  unmetRequirements,
+} from '@/game/base/buildQueue';
 import {
   levelFromXp,
   levelProgress,
   moduleLevel,
-  nextUpgradeCost,
   type PlayerProfile,
 } from '@/game/base/profile';
-import { availableRecipes } from '@/game/crafting/crafting';
-import { buyPriceOf, sellPriceOf, TRADER_STOCK } from '@/game/economy/trader';
+import { currentStage, questFinished, stageProgress } from '@/game/base/questLine';
+import {
+  availableRecipes,
+  craftProgress,
+  craftSlots,
+  failureChanceFor,
+  hasInputs,
+} from '@/game/crafting/craftQueue';
+import { canComplete, contractProgress, offeredContracts } from '@/game/economy/contracts';
+import { pointsToNextTier, tierOf, unlockedTraderIds } from '@/game/economy/reputation';
+import { buyPriceOf, lockedStockFor, refusesItem, sellPriceOf, stockFor } from '@/game/economy/trader';
 import { mergeHudItems, toHudItems, type HudItem } from '@/ui/viewModel';
 import { bar, clear, el, formatCredits, formatWeight } from '@/ui/components/dom';
 import type { Screen } from '@/ui/uiRoot';
@@ -24,15 +46,19 @@ import type { Screen } from '@/ui/uiRoot';
 export interface BaseCallbacks {
   onStartLoadout(): void;
   onUpgrade(moduleId: string): void;
-  onSell(itemId: string, quantity: number): void;
-  onBuy(itemId: string, quantity: number): void;
+  onSell(itemId: string, quantity: number, traderId: string): void;
+  onBuy(itemId: string, quantity: number, traderId: string): void;
   onCraft(recipeId: string): void;
+  onCompleteContract(templateId: string): void;
+  /** Epoch milliseconds. The UI layer owns the clock, the simulation does not. */
+  now(): number;
 }
 
 type Tab = 'stash' | 'trader' | 'workbench' | 'modules';
 
 export function createBaseScreen(profile: PlayerProfile, callbacks: BaseCallbacks): Screen {
   let activeTab: Tab = 'stash';
+  let activeTrader = unlockedTraderIds(profile)[0] ?? 'trd_quartermaster';
 
   const content = el('div', { className: 'grow', style: { overflowY: 'auto' } });
   const creditsLabel = el('div', { className: 'mono', text: formatCredits(profile.credits) });
@@ -52,7 +78,7 @@ export function createBaseScreen(profile: PlayerProfile, callbacks: BaseCallback
 
   for (const [tab, label] of [
     ['stash', 'Lager'],
-    ['trader', 'Händler'],
+    ['trader', 'Handel'],
     ['workbench', 'Werkbank'],
     ['modules', 'Basis'],
   ] as Array<[Tab, string]>) {
@@ -67,22 +93,29 @@ export function createBaseScreen(profile: PlayerProfile, callbacks: BaseCallback
   }
 
   function render(): void {
+    const now = callbacks.now();
     creditsLabel.textContent = formatCredits(profile.credits);
     xpBar.set(levelProgress(profile.xp));
     clear(content);
 
     switch (activeTab) {
       case 'stash':
+        content.appendChild(renderQuest(profile));
         content.appendChild(renderStash(profile));
         break;
       case 'trader':
-        content.appendChild(renderTrader(profile, callbacks));
+        content.appendChild(
+          renderTraders(profile, activeTrader, callbacks, (id) => {
+            activeTrader = id;
+            render();
+          }),
+        );
         break;
       case 'workbench':
-        content.appendChild(renderWorkbench(profile, callbacks));
+        content.appendChild(renderWorkbench(profile, callbacks, now));
         break;
       case 'modules':
-        content.appendChild(renderModules(profile, callbacks));
+        content.appendChild(renderModules(profile, callbacks, now));
         break;
     }
   }
@@ -96,10 +129,7 @@ export function createBaseScreen(profile: PlayerProfile, callbacks: BaseCallback
           el('div', {
             children: [
               el('h1', { className: 'title', text: 'Basis' }),
-              el('div', {
-                className: 'subtitle',
-                text: `Stufe ${levelFromXp(profile.xp)}`,
-              }),
+              el('div', { className: 'subtitle', text: `Stufe ${levelFromXp(profile.xp)}` }),
             ],
           }),
           creditsLabel,
@@ -121,11 +151,77 @@ export function createBaseScreen(profile: PlayerProfile, callbacks: BaseCallback
 
   setTab('stash');
 
-  return {
-    root,
-    // The screen is re-rendered by the state machine after every mutation, so
-    // there is no polling here.
+  /**
+   * Redraw only when a timer on screen would actually change.
+   *
+   * The base screen rebuilds its DOM, so redrawing every frame would be both
+   * wasteful and visibly wrong - it would reset the scroll position sixty times
+   * a second. A whole second, and only while something is running.
+   */
+  let lastSecond = -1;
+  const update = (): void => {
+    if (profile.builds.length === 0 && profile.crafts.length === 0) return;
+    const second = Math.floor(callbacks.now() / 1000);
+    if (second === lastSecond) return;
+    lastSecond = second;
+
+    const scroll = content.scrollTop;
+    render();
+    content.scrollTop = scroll;
   };
+
+  return { root, update };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Quest line
+// ─────────────────────────────────────────────────────────────────────────────
+
+function renderQuest(profile: PlayerProfile): HTMLElement {
+  const stage = currentStage(profile);
+
+  if (!stage || questFinished(profile)) {
+    return el('div', {
+      className: 'panel',
+      children: [
+        el('div', { className: 'panel__title', text: QUEST_LINE_NAME }),
+        el('div', { className: 'muted', text: 'Die Karte ist vollständig. Vorerst.' }),
+      ],
+    });
+  }
+
+  const progress = bar('extraction');
+  progress.set(stageProgress(profile));
+
+  return el('div', {
+    className: 'panel',
+    style: { borderColor: 'var(--color-echo)' },
+    children: [
+      el('div', { className: 'panel__title', text: QUEST_LINE_NAME }),
+      el('div', { className: 'item__name', text: stage.name }),
+      el('div', { className: 'muted', text: stage.description }),
+      el('div', { style: { height: 'var(--space-2)' } }),
+      progress.root,
+      el('div', {
+        className: 'row row--between',
+        children: [
+          el('div', {
+            className: 'muted mono',
+            text: `${formatGoal(profile.quest.progress)} / ${formatGoal(stage.goal.target)}`,
+          }),
+          el('div', {
+            className: 'mono',
+            style: { color: 'var(--color-threat)' },
+            text: formatCredits(stage.rewardCredits),
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+function formatGoal(value: number): string {
+  return value >= 1000 ? `${Math.round(value / 100) / 10}k` : String(Math.floor(value));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -142,50 +238,97 @@ function renderStash(profile: PlayerProfile): HTMLElement {
   }
   for (const item of items) list.appendChild(itemRow(item));
 
-  return el('div', {
-    className: 'panel',
-    children: [
+  const children: HTMLElement[] = [
+    el('div', {
+      className: 'row row--between',
+      children: [
+        el('div', { className: 'panel__title', text: 'Lager' }),
+        el('div', {
+          className: 'muted mono',
+          text: `${formatWeight(weight)} / ${formatWeight(profile.stash.capacityKg)}`,
+        }),
+      ],
+    }),
+    list,
+  ];
+
+  // Insured gear on its way back is stash-adjacent information: it is what the
+  // player will have next raid, and it stops a loss feeling final.
+  if (profile.insuranceReturns.length > 0) {
+    children.push(
+      el('div', { className: 'panel__title', text: 'Versicherung unterwegs' }),
       el('div', {
-        className: 'row row--between',
-        children: [
-          el('div', { className: 'panel__title', text: 'Lager' }),
+        className: 'item-list',
+        children: profile.insuranceReturns.map((entry) =>
           el('div', {
-            className: 'muted mono',
-            text: `${formatWeight(weight)} / ${formatWeight(profile.stash.capacityKg)}`,
+            className: 'item',
+            children: [
+              el('div', { className: 'item__name grow', text: nameOf(entry.itemId) }),
+              el('div', { className: 'item__meta', text: `×${entry.quantity}` }),
+            ],
           }),
-        ],
+        ),
       }),
-      list,
-    ],
-  });
+    );
+  }
+
+  return el('div', { className: 'panel', children });
 }
 
-function renderTrader(profile: PlayerProfile, callbacks: BaseCallbacks): HTMLElement {
+function renderTraders(
+  profile: PlayerProfile,
+  activeTrader: string,
+  callbacks: BaseCallbacks,
+  onSelectTrader: (id: string) => void,
+): HTMLElement {
+  const unlocked = unlockedTraderIds(profile);
+  const traderId = unlocked.includes(activeTrader) ? activeTrader : (unlocked[0] as string);
+  const def = findTrader(traderId);
+
+  const picker = el('div', { className: 'row', style: { gap: 'var(--space-2)' } });
+  for (const id of unlocked) {
+    picker.appendChild(
+      el('button', {
+        className: `btn grow ${id === traderId ? 'btn--primary' : 'btn--ghost'}`,
+        text: findTrader(id)?.name ?? id,
+        onClick: () => onSelectTrader(id),
+      }),
+    );
+  }
+
+  const tier = tierOf(profile, traderId);
+  const toNext = pointsToNextTier(profile, traderId);
+
   const owned = mergeHudItems(toHudItems(profile.stash.slots)).filter(
     (item) => item.category !== 'weapon' || item.quantity > 1,
   );
 
   const sellList = el('div', { className: 'item-list' });
-  for (const item of owned) {
+  const sellable = owned.filter((item) => !refusesItem(traderId, item.itemId));
+  for (const item of sellable) {
     sellList.appendChild(
       tradeRow(
         item.name,
-        `${item.quantity}× · ${formatCredits(sellPriceOf(profile, item.itemId))}`,
+        `${item.quantity}× · ${formatCredits(sellPriceOf(profile, item.itemId, traderId))}`,
         'Verkaufen',
         item.rarity,
-        () => callbacks.onSell(item.itemId, 1),
+        () => callbacks.onSell(item.itemId, 1, traderId),
       ),
     );
   }
-  if (owned.length === 0) {
-    sellList.appendChild(el('div', { className: 'muted', text: 'Nichts zu verkaufen.' }));
+  if (sellable.length === 0) {
+    sellList.appendChild(
+      el('div', {
+        className: 'muted',
+        text: owned.length === 0 ? 'Nichts zu verkaufen.' : `${def?.name} kauft davon nichts.`,
+      }),
+    );
   }
 
   const buyList = el('div', { className: 'item-list' });
-  for (const stock of TRADER_STOCK) {
-    const price = buyPriceOf(profile, stock.itemId);
-    const items = toHudItems([stock]);
-    const item = items[0];
+  for (const stock of stockFor(profile, traderId)) {
+    const price = buyPriceOf(profile, stock.itemId, traderId);
+    const item = toHudItems([stock])[0];
     if (!item) continue;
     buyList.appendChild(
       tradeRow(
@@ -193,14 +336,47 @@ function renderTrader(profile: PlayerProfile, callbacks: BaseCallbacks): HTMLEle
         formatCredits(price),
         'Kaufen',
         item.rarity,
-        () => callbacks.onBuy(stock.itemId, quantityStep(item)),
+        () => callbacks.onBuy(stock.itemId, quantityStep(item), traderId),
         profile.credits < price,
       ),
+    );
+  }
+  for (const locked of lockedStockFor(profile, traderId)) {
+    buyList.appendChild(
+      el('div', {
+        className: 'item',
+        style: { opacity: '0.45' },
+        children: [
+          el('div', { className: 'item__name grow', text: nameOf(locked.itemId) }),
+          el('div', { className: 'item__meta', text: `Ruf ${locked.tier}` }),
+        ],
+      }),
     );
   }
 
   return el('div', {
     children: [
+      picker,
+      el('div', { style: { height: 'var(--space-3)' } }),
+      el('div', {
+        className: 'panel',
+        children: [
+          el('div', { className: 'panel__title', text: def?.name ?? 'Händler' }),
+          el('div', { className: 'muted', text: def?.blurb ?? '' }),
+          el('div', {
+            className: 'row row--between',
+            style: { marginTop: 'var(--space-2)' },
+            children: [
+              el('div', { className: 'mono', text: `Ruf ${tier}` }),
+              el('div', {
+                className: 'muted mono',
+                text: toNext === null ? 'höchste Stufe' : `noch ${Math.ceil(toNext)}`,
+              }),
+            ],
+          }),
+        ],
+      }),
+      renderContracts(profile, traderId, callbacks),
       el('div', {
         className: 'panel',
         children: [el('div', { className: 'panel__title', text: 'Verkaufen' }), sellList],
@@ -213,7 +389,121 @@ function renderTrader(profile: PlayerProfile, callbacks: BaseCallbacks): HTMLEle
   });
 }
 
-function renderWorkbench(profile: PlayerProfile, callbacks: BaseCallbacks): HTMLElement {
+function renderContracts(
+  profile: PlayerProfile,
+  traderId: string,
+  callbacks: BaseCallbacks,
+): HTMLElement {
+  const offers = offeredContracts(profile).filter(
+    (entry) => entry.template.traderId === traderId,
+  );
+  if (offers.length === 0) {
+    return el('div', {
+      className: 'panel',
+      children: [
+        el('div', { className: 'panel__title', text: 'Aufträge' }),
+        el('div', { className: 'muted', text: 'Zurzeit nichts zu erledigen.' }),
+      ],
+    });
+  }
+
+  const list = el('div', { className: 'item-list' });
+  for (const { active, template } of offers) {
+    const progress = contractProgress(profile, template);
+    const ready = canComplete(profile, template);
+    const detail = progress
+      .map((entry) => `${nameOf(entry.itemId)} ${Math.min(entry.have, entry.need)}/${entry.need}`)
+      .join(' · ');
+
+    const button = el('button', {
+      className: `btn ${ready && !active.completed ? 'btn--primary' : 'btn--ghost'}`,
+      text: active.completed ? 'Erledigt' : 'Abgeben',
+      style: { minHeight: '34px', padding: '4px 10px', fontSize: '0.78rem' },
+      onClick: () => callbacks.onCompleteContract(template.id),
+    });
+    button.disabled = active.completed || !ready;
+
+    list.appendChild(
+      el('div', {
+        className: 'item',
+        style: active.completed ? { opacity: '0.5' } : {},
+        children: [
+          el('div', {
+            className: 'grow',
+            children: [
+              el('div', { className: 'item__name', text: template.name }),
+              el('div', { className: 'item__meta', text: detail }),
+              el('div', {
+                className: 'item__meta',
+                style: { color: 'var(--color-threat)' },
+                text: `${formatCredits(template.rewardCredits)} · ${template.rewardXp} XP · Ruf +${template.rewardReputation}`,
+              }),
+            ],
+          }),
+          button,
+        ],
+      }),
+    );
+  }
+
+  return el('div', {
+    className: 'panel',
+    children: [el('div', { className: 'panel__title', text: 'Aufträge' }), list],
+  });
+}
+
+function renderWorkbench(
+  profile: PlayerProfile,
+  callbacks: BaseCallbacks,
+  now: number,
+): HTMLElement {
+  const children: HTMLElement[] = [];
+
+  // Running jobs first: what the base is doing right now outranks what it could
+  // be doing.
+  const queue = el('div', { className: 'item-list' });
+  if (profile.crafts.length === 0) {
+    queue.appendChild(el('div', { className: 'muted', text: 'Nichts in Arbeit.' }));
+  }
+  for (const job of profile.crafts) {
+    const progress = bar('context');
+    progress.set(craftProgress(job, now));
+    queue.appendChild(
+      el('div', {
+        className: 'item',
+        children: [
+          el('div', {
+            className: 'grow',
+            children: [
+              el('div', { className: 'item__name', text: recipeNameOf(job.recipeId) }),
+              progress.root,
+            ],
+          }),
+          el('div', { className: 'item__meta mono', text: formatDuration(secondsRemaining(job, now)) }),
+        ],
+      }),
+    );
+  }
+
+  children.push(
+    el('div', {
+      className: 'panel',
+      children: [
+        el('div', {
+          className: 'row row--between',
+          children: [
+            el('div', { className: 'panel__title', text: 'In Arbeit' }),
+            el('div', {
+              className: 'muted mono',
+              text: `${profile.crafts.length} / ${craftSlots(profile)}`,
+            }),
+          ],
+        }),
+        queue,
+      ],
+    }),
+  );
+
   const recipes = availableRecipes(profile);
   const list = el('div', { className: 'item-list' });
 
@@ -224,48 +514,107 @@ function renderWorkbench(profile: PlayerProfile, callbacks: BaseCallbacks): HTML
   }
 
   for (const recipe of recipes) {
-    const inputs = recipe.inputs.map((input) => `${input.quantity}× ${input.itemId.replace('itm_', '')}`).join(' + ');
+    const inputs = recipe.inputs
+      .map((input) => `${input.quantity}× ${nameOf(input.itemId)}`)
+      .join(' + ');
+    const risk = failureChanceFor(profile, recipe);
+    const meta =
+      // "fertig" is right for a running job and wrong for a recipe listing.
+      `${inputs} · ${recipe.craftSeconds <= 0 ? 'sofort' : formatDuration(recipe.craftSeconds)}` +
+      // A hidden failure chance reads as the game cheating, so it is stated.
+      (risk > 0 ? ` · ${Math.round(risk * 100)} % Fehlschlag` : '');
+
     list.appendChild(
-      tradeRow(recipe.name, inputs, 'Bauen', 'common', () => callbacks.onCraft(recipe.id)),
+      tradeRow(
+        recipe.name,
+        meta,
+        'Bauen',
+        'common',
+        () => callbacks.onCraft(recipe.id),
+        !hasInputs(profile, recipe) || profile.crafts.length >= craftSlots(profile),
+      ),
     );
   }
 
-  return el('div', {
-    className: 'panel',
-    children: [el('div', { className: 'panel__title', text: 'Werkbank' }), list],
-  });
+  children.push(
+    el('div', {
+      className: 'panel',
+      children: [el('div', { className: 'panel__title', text: 'Werkbank' }), list],
+    }),
+  );
+
+  return el('div', { children });
 }
 
-function renderModules(profile: PlayerProfile, callbacks: BaseCallbacks): HTMLElement {
+function renderModules(
+  profile: PlayerProfile,
+  callbacks: BaseCallbacks,
+  now: number,
+): HTMLElement {
   const grid = el('div', { className: 'base__grid' });
 
-  for (const moduleId of ['base_stash', 'base_workbench', 'base_trader', 'base_medical', 'base_research']) {
+  for (const moduleId of ALL_BASE_MODULE_IDS) {
     const def = findBaseModule(moduleId);
     if (!def) continue;
 
     const level = moduleLevel(profile, moduleId);
-    const cost = nextUpgradeCost(profile, moduleId);
-    const next = def.levels.find((entry) => entry.level === level + 1);
+    const next = nextLevelOf(profile, moduleId);
+    const job = buildJobFor(profile, moduleId);
+    const missing = next ? unmetRequirements(profile, next) : [];
 
-    grid.appendChild(
-      el('button', {
-        className: `module${level === 0 ? ' module--locked' : ''}`,
-        onClick: () => callbacks.onUpgrade(moduleId),
-        children: [
-          el('div', { className: 'module__name', text: def.name }),
-          el('div', {
-            className: 'module__level',
-            text: level === 0 ? 'Nicht gebaut' : `Stufe ${level}`,
-          }),
-          el('div', { className: 'muted', text: next?.unlocks ?? 'Maximale Stufe' }),
-          el('div', {
-            className: 'mono',
-            style: { color: cost === null ? 'var(--text-muted)' : 'var(--color-threat)' },
-            text: cost === null ? '—' : formatCredits(cost),
-          }),
-        ],
+    const children: HTMLElement[] = [
+      el('div', { className: 'module__name', text: def.name }),
+      el('div', {
+        className: 'module__level',
+        text: level === 0 ? 'Nicht gebaut' : `Stufe ${level}`,
       }),
-    );
+    ];
+
+    if (job) {
+      const progress = bar('context');
+      progress.set(buildProgress(job, now));
+      children.push(
+        el('div', { className: 'muted', text: 'Im Bau' }),
+        progress.root,
+        el('div', { className: 'mono', text: formatDuration(secondsRemaining(job, now)) }),
+      );
+    } else if (!next) {
+      children.push(
+        el('div', { className: 'muted', text: 'Maximale Stufe' }),
+        el('div', { className: 'mono', style: { color: 'var(--text-muted)' }, text: '—' }),
+      );
+    } else if (missing.length > 0) {
+      // Say what is missing. "Locked" without a reason is the most frustrating
+      // thing a progression screen can do.
+      children.push(
+        el('div', {
+          className: 'muted',
+          text: missing.map((entry) => `${entry.name} Stufe ${entry.level}`).join(', '),
+        }),
+        el('div', { className: 'mono', style: { color: 'var(--text-muted)' }, text: 'gesperrt' }),
+      );
+    } else {
+      children.push(
+        el('div', { className: 'muted', text: next.unlocks }),
+        el('div', {
+          className: 'mono',
+          style: { color: 'var(--color-threat)' },
+          text:
+            formatCredits(next.costCredits) +
+            (next.buildSeconds ? ` · ${formatDuration(next.buildSeconds)}` : ''),
+        }),
+      );
+    }
+
+    const button = el('button', {
+      className: `module${level === 0 ? ' module--locked' : ''}`,
+      onClick: () => callbacks.onUpgrade(moduleId),
+      children,
+    });
+    button.disabled =
+      job !== undefined || !next || missing.length > 0 || profile.credits < next.costCredits;
+
+    grid.appendChild(button);
   }
 
   return el('div', {
@@ -325,4 +674,22 @@ function tradeRow(
 /** Ammunition is bought in useful batches; everything else one at a time. */
 function quantityStep(item: HudItem): number {
   return item.category === 'ammo' ? 30 : 1;
+}
+
+function nameOf(itemId: string): string {
+  return toHudItems([{ itemId, quantity: 1 }])[0]?.name ?? itemId;
+}
+
+function recipeNameOf(recipeId: string): string {
+  return recipeId.replace('rcp_', '');
+}
+
+/** Short, glanceable durations: 45 s, 12 min, 1 h 5 min. */
+export function formatDuration(seconds: number): string {
+  if (seconds <= 0) return 'fertig';
+  if (seconds < 60) return `${Math.ceil(seconds)} s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} h ${minutes % 60} min`;
 }

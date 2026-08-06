@@ -19,7 +19,7 @@ import {
   MapGrid,
 } from '@/game/map/mapGrid';
 import { NavigationCache } from '@/game/ai/navigation';
-import type { Loadout } from '@/game/player/loadout';
+import { createEmptyLoadout, type Loadout } from '@/game/player/loadout';
 import { createIntent } from '@/game/player/playerIntent';
 import { RaidSimulation } from '@/game/simulation/raidSimulation';
 import { createDoor } from '@/game/simulation/factories';
@@ -27,6 +27,7 @@ import { moveCircle } from '@/game/simulation/collision';
 
 function loadout(): Loadout {
   return {
+    ...createEmptyLoadout(),
     weaponItemId: 'itm_wpn_splitter',
     armorItemId: null,
     helmetItemId: null,

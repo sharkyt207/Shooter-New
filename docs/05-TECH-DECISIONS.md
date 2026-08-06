@@ -223,3 +223,46 @@ Boden, der weiterhin blockiert (genau dieser Fehler ist in M4 aufgetreten und
 hat einen Test bekommen). Der Erreichbarkeits-Flood-Fill läuft bewusst **durch**
 verschlossene Türen, weil der Generator garantiert, dass jeder Schlüssel
 außerhalb des Raums liegt, den er öffnet.
+
+---
+
+## ADR-014 — Meta-Zufall ist deterministisch und speicherfest
+
+**Status:** akzeptiert (M5)
+
+**Kontext.** M5 bringt Systeme mit Zufall außerhalb des Raids: Crafting kann
+fehlschlagen, Versicherung gibt nur einen Teil zurück, Aufträge werden gewürfelt.
+Der Raid löst das über benannte Seed-Streams (ADR-009), aber die Basis hat keinen
+Seed — sie läuft über Wochen und über beliebig viele Sitzungen.
+
+**Entscheidung.** Das Profil trägt einen Zähler `metaSeed`. Jeder Zug rückt ihn
+vor und erzeugt daraus einen Wert:
+
+```ts
+nextMetaRandom(profile) {
+  profile.metaSeed = (profile.metaSeed + 1) >>> 0;
+  return new SeededRandom(profile.metaSeed).float();
+}
+```
+
+Und, mindestens ebenso wichtig: **Das Ergebnis wird beim Auslösen gewürfelt und
+gespeichert, nicht beim Einsammeln.** Ein Crafting-Auftrag trägt sein `failed`
+von der Sekunde an, in der er eingereiht wird.
+
+**Begründung.**
+
+1. **Save-Scumming ist sonst trivial.** Würfelt man beim Einsammeln, lädt der
+   Spieler den Speicherstand so lange neu, bis der teure Auftrag gelingt. Ein
+   System, das sich so aushebeln lässt, kann seine Fehlschlagquote auch gleich
+   weglassen — und dann ist die ganze Balance-Arbeit daran verschenkt.
+2. **`Math.random()` ist in `game/**` ohnehin verboten** (ADR-009, erzwungen vom
+   Boundary-Checker). Der Zähler ist die einzige Variante, die diese Regel
+   einhält und trotzdem über Sitzungen hinweg funktioniert.
+3. **Angebote bleiben stabil.** Aufträge werden aus `metaSeed` *und* dem
+   Acht-Stunden-Fenster gewürfelt. Derselbe Spieler sieht dasselbe Angebot,
+   solange das Fenster läuft — kein Neuladen bis der Auftrag passt.
+
+**Konsequenzen.** `metaSeed` gehört in die Speicherstand-Validierung (mindestens
+1, ganzzahlig). Tests würfeln nicht nach einem passenden Seed, sondern setzen
+`job.failed` direkt — das ist möglich, weil das Ergebnis Daten auf dem Auftrag
+sind und keine versteckte Berechnung.

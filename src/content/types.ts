@@ -22,7 +22,8 @@ export type ItemCategory =
   | 'backpack'
   | 'attachment'
   | 'throwable'
-  | 'key';
+  | 'key'
+  | 'container';
 
 /**
  * Where a hit lands.
@@ -348,6 +349,16 @@ export interface BaseModuleLevel {
   unlocks: string;
   /** Extra stash capacity in kilograms, if applicable. */
   stashCapacityKg?: number;
+  /**
+   * Real-time seconds this level takes to build.
+   *
+   * Zero for everything that exists from the first launch. The clock keeps
+   * running during a raid, which is the point: a build timer should be a reason
+   * to go into the rift, never a reason to close the app (see docs/modules/base.md).
+   */
+  buildSeconds?: number;
+  /** Other modules that must already be at a given level. */
+  requires?: ReadonlyArray<{ moduleId: string; level: number }>;
 }
 
 export interface BaseModuleDef {
@@ -366,4 +377,74 @@ export interface RecipeDef {
   inputs: ReadonlyArray<{ itemId: string; quantity: number }>;
   output: { itemId: string; quantity: number };
   craftSeconds: number;
+  /**
+   * Chance the craft goes wrong, 0..1, before the module bonus is applied.
+   * A failed craft returns part of the inputs rather than nothing at all -
+   * see `game/crafting/craftQueue.ts` for why.
+   */
+  failureChance?: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Meta: traders, contracts, quests
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface TraderStockEntry {
+  itemId: string;
+  quantity: number;
+  /** Reputation tier from which this appears in the stock list. */
+  tier: number;
+}
+
+export interface TraderDef {
+  id: string;
+  name: string;
+  /** One line of character - the trader is the only NPC voice in the game. */
+  blurb: string;
+  icon: string;
+  /** Base module gating access, and at which level. */
+  requires: { moduleId: string; level: number };
+  /** Fraction of item value paid when buying from the player. */
+  baseSellFactor: number;
+  /** Multiple of item value charged when selling to the player. */
+  baseBuyFactor: number;
+  /** Categories this trader pays a premium for, and how much. */
+  premiumCategories: ReadonlyArray<{ category: ItemCategory; factor: number }>;
+  /** Categories this trader refuses to buy at all. */
+  refuses: readonly ItemCategory[];
+  stock: readonly TraderStockEntry[];
+}
+
+export interface ContractTemplate {
+  id: string;
+  traderId: string;
+  name: string;
+  /** Items the player has to hand over. */
+  deliver: ReadonlyArray<{ itemId: string; quantity: number }>;
+  rewardCredits: number;
+  rewardXp: number;
+  rewardReputation: number;
+  /** Optional item reward, e.g. a key or a weapon. */
+  rewardItems?: ReadonlyArray<{ itemId: string; quantity: number }>;
+  /** Minimum player level before this may be offered. */
+  minLevel: number;
+}
+
+export type QuestGoalKind =
+  | 'extract'
+  | 'kills'
+  | 'extractValue'
+  | 'openVault'
+  | 'surviveAnomaly'
+  | 'craft'
+  | 'moduleLevel';
+
+export interface QuestStageDef {
+  id: string;
+  name: string;
+  description: string;
+  goal: { kind: QuestGoalKind; target: number; moduleId?: string };
+  rewardCredits: number;
+  rewardXp: number;
+  rewardItems?: ReadonlyArray<{ itemId: string; quantity: number }>;
 }

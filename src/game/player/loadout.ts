@@ -28,6 +28,19 @@ export interface Loadout {
   weaponCondition: number;
   /** Items packed for the raid: ammunition, medical supplies, throwables. */
   carried: InventorySlot[];
+
+  /**
+   * Secure container carried into the raid, or null.
+   *
+   * Whatever is inside comes home whether the player does or not. It is
+   * deliberately tiny - a container that swallowed a whole raid's loot would
+   * delete the decision it exists to create (Pillar P1).
+   */
+  secureContainerItemId: string | null;
+  /** Contents of the secure container at the start of the raid. */
+  secureItems: InventorySlot[];
+  /** Insurance bought for this raid; the premium is charged on commit. */
+  insured: boolean;
 }
 
 export function createEmptyLoadout(): Loadout {
@@ -40,6 +53,9 @@ export function createEmptyLoadout(): Loadout {
     preferredAmmoItemId: null,
     weaponCondition: 1,
     carried: [],
+    secureContainerItemId: null,
+    secureItems: [],
+    insured: false,
   };
 }
 
@@ -53,7 +69,16 @@ export function cloneLoadout(loadout: Readonly<Loadout>): Loadout {
     preferredAmmoItemId: loadout.preferredAmmoItemId,
     weaponCondition: loadout.weaponCondition,
     carried: loadout.carried.map((slot) => ({ ...slot })),
+    secureContainerItemId: loadout.secureContainerItemId,
+    secureItems: loadout.secureItems.map((slot) => ({ ...slot })),
+    insured: loadout.insured,
   };
+}
+
+/** Capacity of the carried secure container, in kilograms. 0 when none. */
+export function secureCapacityKg(loadout: Readonly<Loadout>): number {
+  if (!loadout.secureContainerItemId) return 0;
+  return findItem(loadout.secureContainerItemId)?.capacityKg ?? 0;
 }
 
 /** Carry capacity granted by the equipped backpack, or the bare minimum. */
@@ -108,7 +133,13 @@ export function equippedWeightKg(loadout: Readonly<Loadout>): number {
 /** Every item id the loadout occupies in the stash, attachments included. */
 export function equippedItemIds(loadout: Readonly<Loadout>): string[] {
   const ids: string[] = [];
-  for (const id of [loadout.weaponItemId, loadout.armorItemId, loadout.helmetItemId, loadout.backpackItemId]) {
+  for (const id of [
+    loadout.weaponItemId,
+    loadout.armorItemId,
+    loadout.helmetItemId,
+    loadout.backpackItemId,
+    loadout.secureContainerItemId,
+  ]) {
     if (id) ids.push(id);
   }
   for (const attachmentId of Object.values(loadout.attachments)) {

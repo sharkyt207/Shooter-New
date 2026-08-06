@@ -18,7 +18,7 @@ import type { AnomalyKind, FactionId } from '@/game/components';
 import type { ResolvedWeapon } from '@/game/weapons/weaponStats';
 import { addItem, createInventory } from '@/game/inventory/inventory';
 import type { Loadout } from '@/game/player/loadout';
-import { loadoutCapacityKg } from '@/game/player/loadout';
+import { loadoutCapacityKg, secureCapacityKg } from '@/game/player/loadout';
 import { resolveWeapon } from '@/game/weapons/weaponStats';
 import type { ContainerSpawn, DoorSpawn, ExtractionSpawn } from '@/game/map/mapGenerator';
 import type { RaidWorld } from './raidWorld';
@@ -67,7 +67,14 @@ export function createPlayer(
 
   const inventory = createInventory(loadoutCapacityKg(loadout));
   for (const slot of loadout.carried) addItem(inventory, slot.itemId, slot.quantity);
-  world.carriers.set(entity, { inventory });
+
+  // The secure container is its own inventory with its own (tiny) capacity.
+  let secure = null;
+  if (loadout.secureContainerItemId) {
+    secure = createInventory(secureCapacityKg(loadout));
+    for (const slot of loadout.secureItems) addItem(secure, slot.itemId, slot.quantity);
+  }
+  world.carriers.set(entity, { inventory, secure });
 
   const weapon = loadout.weaponItemId ? weaponDefForItem(loadout.weaponItemId) : undefined;
   if (weapon) {

@@ -15,6 +15,8 @@ export interface InventoryCallbacks {
   onClose(): void;
   onUse(itemId: string): void;
   onDrop(itemId: string, quantity: number): void;
+  /** Move one unit into the secure container. */
+  onSecure(itemId: string): void;
 }
 
 export type SortMode = 'value' | 'weight' | 'name';
@@ -47,6 +49,22 @@ export function createInventoryOverlay(
           onClick: () => {
             callbacks.onUse(selected as string);
             callbacks.onClose();
+          },
+        }),
+      );
+    }
+
+    // The most consequential button in the raid: it decides what survives a
+    // death. It sits before "Ablegen" because it is the one worth reaching for.
+    const vm = getViewModel();
+    if (vm.hasSecure && vm.secureWeight < vm.secureCapacity) {
+      actions.appendChild(
+        el('button', {
+          className: 'btn btn--go grow',
+          text: 'Sichern',
+          onClick: () => {
+            callbacks.onSecure(selected as string);
+            render();
           },
         }),
       );

@@ -13,7 +13,10 @@ implementiert, getestet, optimiert **und** hier dokumentiert ist
 | [ai.md](ai.md) | `game/ai`, `game/enemies` | 🟢 Prototyp fertig |
 | [inventory-loot.md](inventory-loot.md) | `game/inventory`, `game/loot` | 🟢 Prototyp fertig |
 | [extraction.md](extraction.md) | `game/extraction`, `game/simulation` | 🟢 Prototyp fertig |
-| [meta.md](meta.md) | `game/save`, `game/base`, `game/economy`, `game/crafting` | 🟡 Grundgerüst |
+| [meta.md](meta.md) | `game/save` | 🟢 M5 fertig |
+| [base.md](base.md) | `game/base`, `content/baseModules`, `content/quests` | 🟢 M5 fertig |
+| [economy.md](economy.md) | `game/economy`, `content/traders`, `content/contracts` | 🟢 M5 fertig |
+| [crafting.md](crafting.md) | `game/crafting` | 🟢 M5 fertig |
 | [presentation.md](presentation.md) | `render/`, `ui/`, `platform/`, `app/` | 🟢 Prototyp fertig |
 
 ## Aufbau jeder Modul-Doku

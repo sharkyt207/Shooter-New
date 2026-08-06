@@ -73,7 +73,9 @@ export type GameEvents = {
   // ── Loot & inventory ─────────────────────────────────────────────────────
   'loot:pickedUp': { itemId: string; quantity: number; x: number; y: number };
   'loot:dropped': { itemId: string; quantity: number; x: number; y: number };
-  'loot:rejected': { itemId: string; reason: 'overweight' };
+  'loot:rejected': { itemId: string; reason: 'overweight' | 'secureFull' };
+  /** An item was moved into the secure container. */
+  'loot:secured': { itemId: string; quantity: number };
   'container:searchStarted': { entity: EntityId; containerId: string; seconds: number };
   'container:searchCancelled': { entity: EntityId };
   'container:opened': {
@@ -146,6 +148,17 @@ export interface RaidOutcome {
   lootValue: number;
   /** Items secured. Empty unless extracted. */
   loot: Array<{ itemId: string; quantity: number }>;
+  /**
+   * Contents of the secure container. Comes home on *every* outcome - that is
+   * the entire point of the thing.
+   */
+  securedLoot: Array<{ itemId: string; quantity: number }>;
+  /** Credit value of the secured contents. */
+  securedValue: number;
+  /** Locked rooms forced open this raid. Feeds the quest line. */
+  vaultsOpened: number;
+  /** Anomalies the player walked into and came out of alive. */
+  anomaliesSurvived: number;
   /** Echo shards retained even on death (Pillar P5). */
   retainedShards: number;
   zoneName: string | null;

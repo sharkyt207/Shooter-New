@@ -11,12 +11,13 @@ import { LIGHT } from '@/content/balance';
 import { getWeather, type WeatherDef } from '@/content/weather';
 import type { EntityId } from '@/core/ecs/entity';
 import { audibleRadius } from '@/game/ai/perception';
-import type { Loadout } from '@/game/player/loadout';
+import { createEmptyLoadout, type Loadout } from '@/game/player/loadout';
 import { createIntent } from '@/game/player/playerIntent';
 import { RaidSimulation } from '@/game/simulation/raidSimulation';
 
 function loadout(): Loadout {
   return {
+    ...createEmptyLoadout(),
     weaponItemId: 'itm_wpn_splitter',
     armorItemId: null,
     helmetItemId: null,
