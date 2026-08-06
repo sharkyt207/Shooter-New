@@ -1,5 +1,15 @@
 # Build the web version and publish it to GitHub Pages.
 #
+# NOTE: this workflow needs a GitHub Actions runner, and the account has not
+# been allocated one - the first run sat queued with `runner_id: 0` for fifteen
+# minutes before GitHub cancelled it. Until Actions is enabled for the account
+# (Settings -> Actions -> General, and the billing spending limit), publishing
+# goes through `npm run publish:pages`, which pushes the build to the
+# `gh-pages` branch and needs no runner. See docs/12-AUF-DEM-HANDY-TESTEN.md.
+#
+# The workflow is kept rather than deleted: nothing in it is wrong, and it takes
+# over again the moment a runner exists.
+#
 # This is how the game gets onto a phone without a Mac, without Xcode and
 # without a store account: the browser build is the same code the native shell
 # would wrap (ADR-015), and as an installable PWA it lands on the home screen

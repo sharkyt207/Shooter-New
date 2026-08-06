@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke-browser.mjs",
     "smoke:pwa": "node scripts/smoke-pwa.mjs",
+    "publish:pages": "node scripts/publish-pages.mjs",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "verify": "npm run check:boundaries && npm run typecheck && npm test",
     "measure": "node scripts/measure-frame.mjs",

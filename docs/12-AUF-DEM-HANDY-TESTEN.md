@@ -20,16 +20,38 @@ Fenster ohne Browser-Leiste und startet auch ohne Netz.
 https://sharkyt207.github.io/Shooter-New/
 ```
 
-Sie ist nach dem ersten erfolgreichen Durchlauf des Arbeitsablaufs
-**Deploy Pages** erreichbar (Reiter *Actions* im Repository). Der Ablauf baut
-bei jedem Push auf `main` oder einen `claude/**`-Zweig neu — mit dem
-vollständigen Qualitäts-Gate davor, damit auf dem Telefon nie ein Build landet,
-der die Tests nicht besteht.
+### Einmalig einschalten
 
-> Der Arbeitsablauf schaltet GitHub Pages beim ersten Lauf selbst ein
-> (`configure-pages` mit `enablement: true`). Sollte das an einer Einstellung
-> scheitern: *Settings → Pages → Build and deployment → Source:* **GitHub
-> Actions**, dann den Ablauf erneut starten.
+GitHub Pages muss einmal auf den Zweig zeigen, sonst antwortet die Adresse mit
+404:
+
+**Settings → Pages → Build and deployment → Source: „Deploy from a branch"
+→ Branch: `gh-pages` / `(root)` → Save.**
+
+Nach ein bis zwei Minuten ist die Adresse erreichbar.
+
+### Warum ein Zweig und nicht der Actions-Ablauf
+
+`.github/workflows/deploy-pages.yml` existiert und ist richtig — er bekommt nur
+keinen Runner. Der erste Lauf stand fünfzehn Minuten mit `runner_id: 0` in der
+Warteschlange und wurde dann von GitHub abgebrochen; der `deploy`-Job wurde
+übersprungen. Das passiert, wenn GitHub Actions für das Konto nicht
+freigeschaltet ist oder das Ausgabenlimit auf 0 steht. Für ein öffentliches
+Repository sind Actions kostenlos, aber die Freischaltung muss stimmen:
+*Settings → Actions → General* und https://github.com/settings/billing.
+
+Solange das so ist, veröffentlicht der Zweig `gh-pages` ohne Runner:
+
+```bash
+npm run publish:pages
+```
+
+Das prüft, baut, legt die Ausgabe auf den Zweig und pusht. Der Zweig ist
+verwaist (*orphan*) — er enthält nur die Ausgabe, keinen Quelltext, und seine
+Historie vermischt sich nie mit dem Entwicklungszweig.
+
+Sobald Actions läuft, übernimmt der Ablauf wieder von selbst und dieses Skript
+wird überflüssig statt falsch.
 
 ### Auf den Startbildschirm legen
 
