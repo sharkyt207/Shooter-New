@@ -1,14 +1,19 @@
 # Build the web version and publish it to GitHub Pages.
 #
-# NOTE: this workflow needs a GitHub Actions runner, and the account has not
-# been allocated one - the first run sat queued with `runner_id: 0` for fifteen
-# minutes before GitHub cancelled it. Until Actions is enabled for the account
-# (Settings -> Actions -> General, and the billing spending limit), publishing
-# goes through `npm run publish:pages`, which pushes the build to the
-# `gh-pages` branch and needs no runner. See docs/12-AUF-DEM-HANDY-TESTEN.md.
+# **Disabled as an automatic trigger, on purpose.** Pages is currently served
+# from the `gh-pages` branch ("Deploy from a branch"), and in that mode GitHub
+# refuses Actions deployments to the `github-pages` environment - this workflow's
+# `deploy` job failed in one second with no runner assigned. Worse, it shares
+# the `pages` concurrency group with GitHub's own built-in Pages workflow, so
+# leaving it on a push trigger meant the two competed and *neither* deployed.
 #
-# The workflow is kept rather than deleted: nothing in it is wrong, and it takes
-# over again the moment a runner exists.
+# Publishing therefore goes through `npm run publish:pages`, which pushes the
+# build to `gh-pages` and lets GitHub's built-in publisher take it from there.
+# See docs/12-AUF-DEM-HANDY-TESTEN.md.
+#
+# To switch back to deploying from Actions: set Settings -> Pages -> Source to
+# "GitHub Actions", then restore the `push:` trigger below. Both halves are
+# needed; either one alone produces the failure described above.
 #
 # This is how the game gets onto a phone without a Mac, without Xcode and
 # without a store account: the browser build is the same code the native shell
@@ -16,16 +21,16 @@
 # with its own icon and its own window.
 #
 # The full gate runs first. Publishing a build that does not pass `verify` would
-# make the thing on the phone useless as a test — you would not know whether a
+# make the thing on the phone useless as a test - you would not know whether a
 # bug is in the game or in the build.
 name: Deploy Pages
 
 on:
-  push:
-    branches:
-      - main
-      - 'claude/**'
-  # So a deploy can be re-run without an empty commit.
+  # Manual only. The `push:` trigger is commented out rather than deleted so
+  # switching back is one edit, not archaeology.
+  #
+  # push:
+  #   branches: [main, 'claude/**']
   workflow_dispatch:
 
 permissions:
@@ -36,7 +41,9 @@ permissions:
 # One deploy at a time. `cancel-in-progress: false` because cancelling a
 # half-finished deploy is how a site ends up in a broken state.
 concurrency:
-  group: pages
+  # Named apart from GitHub's built-in Pages workflow, which uses "pages".
+  # Sharing that group is what let the two block each other.
+  group: pages-actions
   cancel-in-progress: false
 
 jobs:
