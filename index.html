@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#080A0F" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="description" content="PROJECT ECHO - Isometrischer Extraction-Shooter in einer zerbrochenen Realität." />
+
+    <!-- Fullscreen, no browser chrome, when added to the iOS home screen. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <title>PROJECT ECHO</title>
+  </head>
+  <body>
+    <!-- The world is rendered into this canvas by PixiJS. -->
+    <div id="game-canvas" class="game-canvas"></div>
+
+    <!-- All UI lives in a DOM overlay above the canvas (ADR-007). -->
+    <div id="ui-root" class="ui-root"></div>
+
+    <script type="module" src="/src/app/main.ts"></script>
+  </body>
+</html>

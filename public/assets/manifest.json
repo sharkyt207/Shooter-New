@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "_readme": [
+    "PROJECT ECHO - Asset-Manifest.",
+    "Dies ist der EINZIGE Ort im Projekt, an dem Dateipfade stehen (ADR-008).",
+    "Der Code kennt ausschliesslich logische Keys wie 'actor.player'.",
+    "",
+    "Ein Key ohne Eintrag faellt automatisch auf eine prozedurale",
+    "Platzhaltergrafik zurueck - fehlende Assets blockieren die Entwicklung nie.",
+    "",
+    "Canva-Assets einbinden (docs/07-ASSET-PIPELINE.md):",
+    "  1. In Canva gestalten, als PNG @2x mit Transparenz exportieren",
+    "  2. Datei nach public/assets/<kategorie>/ legen",
+    "  3. Hier einen Eintrag ergaenzen - fertig, keine Code-Aenderung",
+    "",
+    "Felder je Eintrag:",
+    "  src     Pfad relativ zu public/assets/",
+    "  anchor  [x, y] in 0..1 - Fusspunkt fuer die isometrische Tiefensortierung",
+    "  slice9  [links, oben, rechts, unten] - fuer skalierbare UI-Panels"
+  ],
+  "textures": {}
+}

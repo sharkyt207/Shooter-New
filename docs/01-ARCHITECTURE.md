@@ -70,13 +70,17 @@ wenn eine verbotene Abhängigkeit entsteht.
 | **core**     | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **content**  | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **game**     | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **platform** | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| **platform** | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
 | **render**   | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **ui**       | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
 | **app**      | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 > `render` und `ui` dürfen `game` **lesen**, aber niemals dessen Zustand direkt mutieren.
 > Änderungen laufen ausschließlich über **Commands/Intents** (siehe Abschnitt 5).
+>
+> `platform` darf `content` lesen: Eingabe-Tuning (Deadzone, Stick-Radius) ist ein
+> designseitiger Balance-Wert und gehört nach `content/balance.ts` (ADR-010).
+> `content` ist reine Daten und hängt nur von `core` ab — es entsteht kein Zyklus.
 
 ---
 
@@ -85,7 +89,7 @@ wenn eine verbotene Abhängigkeit entsteht.
 | Bereich | Wahl | Begründung (Kurzform, Details in `05-TECH-DECISIONS.md`) |
 |---------|------|-----------------------------------------------------------|
 | Sprache | **TypeScript (strict)** | Typsicherheit über Modulgrenzen, refactor-fest bei wachsender Codebasis |
-| Build | **Vite 7** | Sofortiger HMR, minimale Konfiguration, optimierte Produktionsbundles |
+| Build | **Vite 8** | Sofortiger HMR, minimale Konfiguration, optimierte Produktionsbundles |
 | Renderer | **PixiJS v8** (WebGL2/WebGPU) | Bestes 2D-Performance/Aufwand-Verhältnis auf Mobile, Shader-fähig für Licht |
 | UI | **DOM + CSS** (Overlay) | Gestochen scharfe Schrift, natives Scrolling/Touch, Canva-Assets als `<img>` direkt austauschbar |
 | Tests | **Vitest** | Gleiche Toolchain wie Vite, schnelle headless Sim-Tests |
@@ -224,7 +228,15 @@ Objekt-Pools für Projektile und Partikel.
 | Typprüfung | `npm run typecheck` | vor jedem Commit |
 | Unit-/Sim-Tests | `npm test` | vor jedem Commit |
 | Architektur-Grenzen | `npm run check:boundaries` | vor jedem Commit |
+| Browser-Smoke-Test | `npm run smoke` | vor jedem Meilenstein-Abschluss |
 | Alles zusammen | `npm run verify` | Definition of Done pro Modul |
+
+`npm run smoke` fährt das gebaute Spiel in einem echten Browser durch den
+kompletten Loop (Menü → Basis → Loadout → Briefing → Raid → Bewegen, Schießen,
+Inventar) und schlägt bei jedem Konsolenfehler fehl. Zwei Renderer-Bugs des
+Prototyps waren ausschließlich hier sichtbar, nicht in Unit-Tests
+(siehe `docs/modules/presentation.md`). Playwright ist bewusst **keine**
+Projektabhängigkeit (ADR-012), sondern wird bei Bedarf installiert.
 
 **Definition of Done** für ein Modul:
 1. Implementiert, 2. getestet, 3. `npm run verify` grün, 4. `docs/modules/<modul>.md` geschrieben,

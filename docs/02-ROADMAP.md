@@ -57,6 +57,10 @@ erst dann das nächste. Kein paralleles Anfangen von Baustellen.
 
 **Exit-Kriterium:** Die vier Punkte aus `00-VISION.md` §9 sind erfüllt.
 
+**Ergebnis M1:** Loop vollständig spielbar, 107 Unit-/Simulationstests grün,
+Browser-Smoke-Test fehlerfrei, Architekturgrenzen maschinell erzwungen.
+Modul-Dokumentation unter `docs/modules/`.
+
 ---
 
 ## M2 — Kampf & Waffen (nächster Schritt)

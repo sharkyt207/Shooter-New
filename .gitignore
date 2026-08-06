@@ -15,3 +15,4 @@ coverage/
 /ios/App/Pods/
 /android/.gradle/
 /android/app/build/
+.smoke/

@@ -1,0 +1,85 @@
+/*
+ * Design tokens (docs/08-UI-UX.md, section 9).
+ *
+ * Every colour, spacing and radius in the UI comes from here. No component
+ * hardcodes a value. A complete re-skin - Canva placeholders to final Figma
+ * art - is a change to this file plus the asset manifest.
+ */
+
+:root {
+  /* ── Palette: world ─────────────────────────────────────────────────── */
+  --color-void: #080a0f;
+  --color-deep-slate: #12161f;
+  --color-slate: #1c2331;
+  --color-concrete: #2a3344;
+  --color-fog: #3d4a5f;
+  --color-bone: #c9d1de;
+
+  /* ── Palette: signal (functional, never decorative) ─────────────────── */
+  --color-echo: #38e1d4;
+  --color-extraction: #5be37a;
+  --color-threat: #ffb13d;
+  --color-danger: #ff4d5e;
+  --color-rare: #a96bff;
+
+  /* ── Rarity ─────────────────────────────────────────────────────────── */
+  --rarity-common: #8a94a6;
+  --rarity-uncommon: #5be37a;
+  --rarity-rare: #3da9fc;
+  --rarity-epic: #a96bff;
+  --rarity-legendary: #ffb13d;
+
+  /* ── Surfaces ───────────────────────────────────────────────────────── */
+  --surface-panel: rgba(18, 22, 31, 0.92);
+  --surface-panel-solid: #12161f;
+  --surface-raised: rgba(42, 51, 68, 0.72);
+  --surface-sunken: rgba(8, 10, 15, 0.6);
+  --border-subtle: rgba(201, 209, 222, 0.12);
+  --border-strong: rgba(201, 209, 222, 0.28);
+
+  /* ── Text ───────────────────────────────────────────────────────────── */
+  --text-primary: #e6ebf2;
+  --text-secondary: #9aa5b5;
+  --text-muted: #6b7787;
+
+  /* ── Spacing ────────────────────────────────────────────────────────── */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* ── Radii ──────────────────────────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* ── Typography ─────────────────────────────────────────────────────── */
+  --font-display: 'Barlow Condensed', 'Oswald', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* ── Touch ──────────────────────────────────────────────────────────── */
+  --tap-min: 44px; /* Apple HIG minimum target size */
+
+  /* ── Safe area (notch, home indicator) ──────────────────────────────── */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
+  /* ── Motion ─────────────────────────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-normal: 220ms;
+}
+
+/* Respect the OS-level reduced motion preference (docs/08-UI-UX.md, §8). */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+  }
+}

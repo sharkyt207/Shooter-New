@@ -18,7 +18,7 @@ Legende Reifegrad: 🟢 Prototyp fertig · 🟡 Grundgerüst · ⚪ geplant
 | `core/math/random` | Deterministischer Zufall mit benannten Streams | `SeededRandom`, `RandomStreams` | 🟢 |
 | `core/events` | Typisierter, synchroner Event-Bus | `EventBus<TMap>` | 🟢 |
 | `core/time` | Fester Zeitschritt, Interpolations-Alpha | `FixedClock` | 🟢 |
-| `core/util` | Logger, Asserts, Objekt-Pool | `Logger`, `ObjectPool<T>` | 🟢 |
+| `core/util` | Logger, Objekt-Pool | `Logger`, `ObjectPool<T>` | 🟢 |
 
 **Regel:** `core` enthält **keine** Spielbegriffe. Kein „Waffe", kein „Loot", kein „Raid".
 
@@ -28,14 +28,13 @@ Legende Reifegrad: 🟢 Prototyp fertig · 🟡 Grundgerüst · ⚪ geplant
 
 | Modul | Zweck | Status |
 |-------|-------|--------|
-| `content/ids` | Alle IDs als String-Literal-Typen → Tippfehler werden Compile-Fehler | 🟢 |
+| `content/types` | Schema aller Definitionen; IDs werden je Datei als String-Literal-Typ abgeleitet → Tippfehler sind Compile-Fehler | 🟢 |
 | `content/items` | Items: Kategorie, Gewicht, Wert, Stack, Icon-Key | 🟢 |
 | `content/weapons` | Waffen-Stats, Munitionstyp, Handling | 🟢 |
 | `content/enemies` | Gegner-Archetypen: Stats, Wahrnehmung, Verhalten, Loot | 🟢 |
 | `content/lootTables` | Gewichtete Tabellen pro Containertyp und Biom | 🟢 |
 | `content/biomes` | Fragment-Typen der Echo-Welt (Labor, Wald, Station, …) | 🟢 |
-| `content/baseModules` | Basisgebäude, Ausbaustufen, Kosten, Freischaltungen | 🟡 |
-| `content/recipes` | Crafting-Rezepte | 🟡 |
+| `content/baseModules` | Basisgebäude, Ausbaustufen, Kosten, Freischaltungen, Crafting-Rezepte | 🟡 |
 | `content/balance` | **Alle** Balance-Konstanten zentral | 🟢 |
 
 **Regel:** Content ist **rein deklarativ**. Keine Funktion, kein `if`, kein Import aus `game/`.
@@ -49,10 +48,11 @@ Orchestriert einen Raid: hält `World`, `SeededRandom`, `EventBus`, Kollisionsgi
 Systemliste in fester Reihenfolge.
 
 ```ts
-const sim = new RaidSimulation({ seed, loadout, biomeMix });
-sim.setPlayerIntent(intent);
-sim.tick(FIXED_DT);        // exakt ein Sim-Schritt
-sim.getSnapshot();         // read-only View für Renderer/UI
+const sim = new RaidSimulation({ seed, loadout });
+sim.start();
+sim.applyIntent(intent);
+sim.step();                // exakt ein fester Sim-Schritt
+sim.snapshot();            // read-only View für Renderer/UI
 ```
 
 ### `game/player` 🟢
@@ -88,7 +88,8 @@ IDLE ──sieht/hört──► INVESTIGATE ──sieht──► CHASE ──in 
 ```
 
 ### `game/extraction` 🟢
-Zonen mit Zustand `locked → available → active → used`, Halte-Timer, Abbruch bei Verlassen.
+Zonen mit Zustand `locked → available → closing → closed`, Halte-Timer,
+Abbruch bei Verlassen der Zone oder bei Beschuss. Erfolgreiche Nutzung setzt `used`.
 
 ### `game/map` 🟢
 Fragment-Komposition: mehrere Biom-Fragmente werden über Nahtzonen verbunden,
@@ -122,9 +123,9 @@ Der Rest des Spiels kennt nur das Interface.
 |-------|-------|
 | `render/assets/assetRegistry` | Löst logische Keys über `manifest.json` auf, fällt sonst auf Platzhalter zurück |
 | `render/assets/placeholderFactory` | Erzeugt prozedurale Platzhalter-Texturen (kein fehlendes Bild blockiert je die Entwicklung) |
-| `render/iso/isoProjection` | Welt (Meter) ⇄ Bildschirm (Iso-Pixel), Tiefensortierung |
-| `render/layers/*` | Boden, Entities, Licht, VFX, Debug — getrennte Container |
-| `render/worldRenderer` | Liest Sim-Snapshot, interpoliert, zeichnet |
+| `render/iso/isoProjection` | Welt (Meter) ⇄ Bildschirm (Iso-Pixel), Tiefensortierung, Sicht-Culling |
+| `render/camera` | Weiches Folgen, Vorausblick in Zielrichtung, Kamerawackeln |
+| `render/worldRenderer` | Liest Sim, interpoliert, zeichnet — Ebenen (Boden, Ground, Entities, VFX, Darkness) als Container darin |
 
 **Regel:** Renderer **liest** die Simulation. Er schreibt nie hinein.
 
@@ -136,9 +137,10 @@ Der Rest des Spiels kennt nur das Interface.
 |-------|-------|
 | `ui/uiRoot` | Screen-Stack, Ein-/Ausblenden, Lebenszyklus |
 | `ui/hud/*` | Vitals, Munition, Minimap, Extraction-Banner, Touch-Sticks |
-| `ui/screens/*` | MainMenu, Base, Loadout, Inventory, RaidResult |
-| `ui/components/*` | Button, Panel, ItemSlot, ProgressBar, ListView |
+| `ui/screens/*` | MainMenu, Base, Loadout, Briefing, Result, Inventory, Pause |
+| `ui/components/dom` | Deklarative Elementerzeugung, Balken, Formatierung |
 | `ui/styles/*` | Design-Tokens (Farben, Abstände, Radien, Schrift) |
+| `ui/viewModel` | Übersetzt ECS-Zustand in ein flaches UI-Snapshot-Objekt |
 
 **Regel:** UI sendet **Intents**, nie direkte Mutationen. `ui → app → game`.
 
@@ -150,7 +152,6 @@ Der Rest des Spiels kennt nur das Interface.
 |-------|-------|
 | `app/game` | Verdrahtung aller Schichten (Composition Root) |
 | `app/gameStateMachine` | `Boot → MainMenu → Base → Loadout → Raid → RaidResult` |
-| `app/viewModel` | Übersetzt ECS-Zustand in ein flaches UI-Snapshot-Objekt |
 | `app/main` | Einstiegspunkt, Fehlerbehandlung, Lifecycle-Hooks |
 
 ---

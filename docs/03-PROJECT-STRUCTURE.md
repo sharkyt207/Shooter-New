@@ -29,7 +29,8 @@ Shooter-New/
 │       └── audio/                 # Sounds (ab M7)
 │
 ├── scripts/
-│   └── check-boundaries.mjs       # Erzwingt Architekturregeln im CI/Precommit
+│   ├── check-boundaries.mjs       # Erzwingt Architekturregeln im CI/Precommit
+│   └── smoke-browser.mjs          # End-to-End-Test im echten Browser
 │
 ├── src/
 │   │
@@ -45,17 +46,16 @@ Shooter-New/
 │   │   │   └── scalar.ts          # clamp, lerp, approach, angleDelta
 │   │   ├── events/eventBus.ts     # Typisierter, synchroner Bus
 │   │   ├── time/fixedClock.ts     # Fester Zeitschritt + Interpolations-Alpha
-│   │   └── util/                  # assert, logger, id, objectPool
+│   │   └── util/                  # logger, objectPool
 │   │
 │   ├── content/                   # ── DATEN, kein Verhalten ──
-│   │   ├── ids.ts                 # Alle IDs als String-Literal-Typen
-│   │   ├── items.ts               # Item-Definitionen
-│   │   ├── weapons.ts             # Waffen-Definitionen
+│   │   ├── types.ts               # Schema aller Content-Definitionen
+│   │   ├── items.ts               # Item-Definitionen (+ ItemId-Typ)
+│   │   ├── weapons.ts             # Waffen-Definitionen (+ WeaponId-Typ)
 │   │   ├── enemies.ts             # Gegner-Archetypen
 │   │   ├── lootTables.ts          # Gewichtete Loot-Tabellen
-│   │   ├── biomes.ts              # Fragment-Typen für die Weltgenerierung
-│   │   ├── baseModules.ts         # Basisgebäude + Ausbaustufen
-│   │   ├── recipes.ts             # Crafting-Rezepte
+│   │   ├── biomes.ts              # Fragment-Typen + Container-Definitionen
+│   │   ├── baseModules.ts         # Basisgebäude, Ausbaustufen, Crafting-Rezepte
 │   │   └── balance.ts             # ALLE Balance-Konstanten an einem Ort
 │   │
 │   ├── game/                      # ── DIE SIMULATION (pure TS, kein DOM/Pixi) ──
@@ -63,6 +63,10 @@ Shooter-New/
 │   │   ├── gameEvents.ts          # Event-Vertrag Sim → Präsentation
 │   │   ├── simulation/
 │   │   │   ├── raidSimulation.ts  # Orchestriert Systeme + Weltzustand
+│   │   │   ├── raidWorld.ts       # ECS-Welt mit allen Component-Stores
+│   │   │   ├── simContext.ts      # Kontextobjekt für alle Systeme
+│   │   │   ├── collision.ts       # Kreis-gegen-Gitter-Bewegung
+│   │   │   ├── factories.ts       # Bauplan je Entity-Art
 │   │   │   └── systems/           # Ein System = eine Datei = eine Aufgabe
 │   │   ├── player/                # Spieler-Erstellung, Zustand, Intents
 │   │   ├── combat/                # Projektile, Schaden, Tod
@@ -88,28 +92,32 @@ Shooter-New/
 │   │   │   ├── assetRegistry.ts   # Logischer Key → Textur (mit Platzhalter-Fallback)
 │   │   │   └── placeholderFactory.ts # Prozedurale Platzhalter, solange Assets fehlen
 │   │   ├── iso/isoProjection.ts   # Welt (Meter) → Bildschirm (Iso-Pixel)
-│   │   ├── layers/                # Boden, Entities, Licht, VFX, Debug
-│   │   └── worldRenderer.ts       # Liest Sim, zeichnet Szene
+│   │   ├── camera.ts              # Folgen, Vorausblick, Kamerawackeln
+│   │   └── worldRenderer.ts       # Liest Sim, zeichnet Szene (Ebenen inline)
 │   │
 │   ├── ui/                        # ── DOM-Overlay ──
 │   │   ├── uiRoot.ts              # Screen-Verwaltung, Lebenszyklus
 │   │   ├── components/            # Wiederverwendbare Bausteine (Button, Panel, List)
 │   │   ├── hud/                   # In-Raid-HUD, Minimap, Sticks
-│   │   ├── screens/               # MainMenu, Base, Loadout, RaidResult, Inventory
-│   │   └── styles/                # CSS, Design-Tokens
+│   │   ├── screens/               # MainMenu, Base, Loadout, Briefing, Result, …
+│   │   ├── styles/                # CSS, Design-Tokens
+│   │   └── viewModel.ts           # Sim-Zustand → flaches UI-Snapshot
 │   │
 │   └── app/                       # ── KOMPOSITION: darf alles kennen ──
 │       ├── main.ts                # Einstiegspunkt
 │       ├── game.ts                # Verdrahtet Sim, Renderer, UI, Platform
-│       ├── gameStateMachine.ts    # Boot → Menu → Base → Loadout → Raid → Result
-│       └── viewModel.ts           # Sim-Zustand → UI-Snapshot (entkoppelt UI von ECS)
+│       └── gameStateMachine.ts    # Boot → Menu → Base → Loadout → Raid → Result
 │
 ├── index.html
 ├── package.json
 ├── tsconfig.json
-├── vite.config.ts
+├── vite.config.ts                 # Build + Vitest in einer Konfiguration
 └── README.md
 ```
+
+> Der Baum oben entspricht dem tatsächlichen Stand nach M1. Wächst ein Bereich
+> (z. B. `render/layers/`, wenn der Licht-Pass in M4 dazukommt), wird dieses
+> Dokument im selben Commit mitgezogen.
 
 ## Konventionen
 

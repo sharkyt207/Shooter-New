@@ -27,7 +27,10 @@ const ALLOWED_IMPORTS = {
   core: ['core'],
   content: ['core', 'content'],
   game: ['core', 'content', 'game'],
-  platform: ['core', 'platform'],
+  // `platform` may read `content`: input tuning (deadzones, stick radius) is a
+  // design-owned balance value and belongs in content/balance.ts (ADR-010).
+  // `content` is pure data and depends only on `core`, so this adds no cycle.
+  platform: ['core', 'content', 'platform'],
   render: ['core', 'content', 'game', 'platform', 'render'],
   ui: ['core', 'content', 'game', 'platform', 'ui'],
   app: ['core', 'content', 'game', 'platform', 'render', 'ui', 'app'],
