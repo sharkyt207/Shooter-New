@@ -11,7 +11,8 @@
 
 import type { EntityId } from '@/core/ecs/entity';
 import type { HitZone } from '@/content/types';
-import type { AiState, FactionId } from './components';
+import type { FactionId } from '@/content/factions';
+import type { AiState } from './components';
 
 /**
  * Declared as a type alias rather than an interface on purpose: only type
@@ -66,6 +67,7 @@ export type GameEvents = {
     y: number;
     killer: EntityId | null;
     xp: number;
+    isBoss: boolean;
   };
 
   // ── Loot & inventory ─────────────────────────────────────────────────────
@@ -96,6 +98,9 @@ export type GameEvents = {
   // ── AI ───────────────────────────────────────────────────────────────────
   'ai:stateChanged': { entity: EntityId; from: AiState; to: AiState };
   'ai:alerted': { entity: EntityId; x: number; y: number };
+  /** A boss noticed the player. Drives the HUD banner and its health bar. */
+  'boss:engaged': { entity: EntityId; name: string; health: number; maxHealth: number };
+  'boss:phaseChanged': { entity: EntityId; label: string };
 
   // ── Extraction & raid flow ───────────────────────────────────────────────
   'extraction:opened': { zoneId: string; name: string; x: number; y: number };

@@ -351,6 +351,26 @@ body {
   animation: pulse 1s infinite;
 }
 
+.hud__boss {
+  position: absolute;
+  top: calc(var(--safe-top) + 44px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(52vw, 340px);
+  text-align: center;
+  pointer-events: none;
+}
+
+.hud__boss .bar {
+  height: 9px;
+  margin-top: var(--space-1);
+  border: 1px solid var(--color-rare);
+}
+
+.bar--boss .bar__fill {
+  background: var(--color-rare);
+}
+
 .hud__minimap {
   position: absolute;
   top: calc(var(--safe-top) + var(--space-3));

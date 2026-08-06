@@ -53,6 +53,8 @@ export interface EnemySpawn {
   enemyId: string;
   x: number;
   y: number;
+  /** Bosses are placed deliberately and never grouped into ordinary squads. */
+  isBoss?: boolean;
 }
 
 export interface AnomalySpawn {
@@ -148,6 +150,7 @@ export function generateMap(
   const containers = placeContainers(grid, fragments, openByFragment, rng);
   const enemies = placeEnemies(grid, fragments, openByFragment, playerSpawn, rng);
   const anomalies = placeAnomalies(grid, fragments, openByFragment, rng);
+  placeWarden(grid, fragments, openByFragment, playerSpawn, enemies, rng);
 
   return {
     grid,
@@ -444,6 +447,43 @@ function placeEnemies(
   }
 
   return spawns;
+}
+
+/**
+ * Place a Warden in the fragment furthest from the spawn.
+ *
+ * Not guaranteed: a boss in every raid would make it routine. When one is
+ * there, it sits far from the entrance so meeting it is always a decision to
+ * have pushed deep, never an accident on the way in.
+ */
+function placeWarden(
+  grid: MapGrid,
+  fragments: FragmentInfo[],
+  openByFragment: number[][],
+  spawn: SpawnPoint,
+  enemies: EnemySpawn[],
+  rng: SeededRandom,
+): void {
+  if (!rng.chance(MAP.wardenChance)) return;
+
+  const lastFragment = fragments[fragments.length - 1];
+  if (!lastFragment) return;
+
+  const cells = openByFragment[lastFragment.index] ?? [];
+  const minDistSq = 30 * 30;
+
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const index = pickClearCell(grid, cells, rng);
+    if (index === null) return;
+
+    const position = cellToWorld(grid, index);
+    const dx = position.x - spawn.x;
+    const dy = position.y - spawn.y;
+    if (dx * dx + dy * dy < minDistSq) continue;
+
+    enemies.push({ enemyId: 'enm_warden', x: position.x, y: position.y, isBoss: true });
+    return;
+  }
 }
 
 function placeAnomalies(

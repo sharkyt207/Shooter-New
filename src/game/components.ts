@@ -11,6 +11,7 @@
 
 import type { EntityId } from '@/core/ecs/entity';
 import type { AttachmentLoadout } from '@/content/types';
+import type { FactionId } from '@/content/factions';
 import type { InventoryState } from './inventory/inventory';
 
 export interface Transform {
@@ -42,11 +43,22 @@ export interface Health {
   lastAttacker: EntityId | null;
 }
 
-export type FactionId = 'player' | 'scavengers' | 'order' | 'weaved' | 'wardens';
+export type { FactionId };
 
 export interface Faction {
   id: FactionId;
 }
+
+/** Squad this entity belongs to, or -1 when it fights alone. */
+export interface SquadMember {
+  squadId: number;
+  /** Role assigned by the squad each tick. */
+  role: SquadRole;
+  /** Seconds until this member may throw again. */
+  throwCooldown: number;
+}
+
+export type SquadRole = 'assault' | 'suppress' | 'flank';
 
 /** Marks the single player-controlled entity. */
 export interface PlayerTag {
@@ -134,6 +146,10 @@ export interface EnemyAgent {
   perceptionTimer: number;
   /** Seconds to wait before choosing the next patrol point. */
   waitTimer: number;
+  /** Last boss phase label emitted, so a change fires exactly once. */
+  phaseLabel: string;
+  /** True once a boss has announced itself to the player. */
+  announced: boolean;
 }
 
 /** An item lying on the ground, ready to be picked up. */

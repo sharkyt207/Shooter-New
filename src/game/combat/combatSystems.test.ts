@@ -199,6 +199,8 @@ describe('throwables', () => {
       burstRemaining: 0,
       perceptionTimer: 0,
       waitTimer: 0,
+      phaseLabel: '',
+      announced: false,
     });
     const health = sim.world.healths.require(enemy);
 
@@ -278,6 +280,8 @@ describe('melee', () => {
         burstRemaining: 0,
         perceptionTimer: 0,
         waitTimer: 0,
+        phaseLabel: '',
+        announced: false,
       });
       const health = sim.world.healths.require(enemy);
 

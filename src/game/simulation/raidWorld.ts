@@ -24,6 +24,7 @@ import type {
   PlayerTag,
   Projectile,
   Renderable,
+  SquadMember,
   Stamina,
   Thrown,
   Transform,
@@ -56,6 +57,7 @@ export class RaidWorld extends World {
   readonly hitFlashes: ComponentStore<HitFlash>;
   readonly thrown: ComponentStore<Thrown>;
   readonly disoriented: ComponentStore<Disoriented>;
+  readonly squadMembers: ComponentStore<SquadMember>;
 
   /** The player entity, or NULL once the player has died. */
   playerEntity: EntityId | null = null;
@@ -83,6 +85,7 @@ export class RaidWorld extends World {
     this.hitFlashes = this.registerStore<HitFlash>('hitFlash');
     this.thrown = this.registerStore<Thrown>('thrown');
     this.disoriented = this.registerStore<Disoriented>('disoriented');
+    this.squadMembers = this.registerStore<SquadMember>('squadMember');
   }
 
   /** Convenience: does this entity still exist and have health left? */

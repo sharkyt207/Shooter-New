@@ -66,8 +66,12 @@ export function deathSystem(ctx: SimContext): void {
       y,
       killer,
       xp,
+      isBoss: def?.isBoss ?? false,
     });
 
+    // A squad must forget its dead, or role assignment keeps handing jobs to
+    // corpses.
+    ctx.squads.remove(entity);
     world.destroyEntity(entity);
   }
 }
@@ -80,6 +84,7 @@ function handlePlayerDeath(ctx: SimContext, entity: EntityId, x: number, y: numb
     y,
     killer: ctx.world.healths.get(entity)?.lastAttacker ?? null,
     xp: 0,
+    isBoss: false,
   });
   ctx.bus.emit('camera:shake', { intensity: 1 });
 

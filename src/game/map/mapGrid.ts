@@ -155,6 +155,49 @@ export class MapGrid {
     return true;
   }
 
+  /**
+   * How many wall cells a straight line crosses.
+   *
+   * Used by the hearing model: sound does not stop at a wall, it is muffled by
+   * it. Counting walls is a cheap, deterministic stand-in for real acoustic
+   * propagation and is more than enough at this scale.
+   */
+  countWallsBetween(x0: number, y0: number, x1: number, y1: number): number {
+    const cs = this.cellSize;
+    let cx = this.worldToCellX(x0);
+    let cy = this.worldToCellY(y0);
+    const endX = this.worldToCellX(x1);
+    const endY = this.worldToCellY(y1);
+    if (cx === endX && cy === endY) return 0;
+
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const stepX = dx > 0 ? 1 : -1;
+    const stepY = dy > 0 ? 1 : -1;
+
+    let tMaxX = dx !== 0 ? ((dx > 0 ? cx + 1 : cx) * cs - x0) / dx : Infinity;
+    let tMaxY = dy !== 0 ? ((dy > 0 ? cy + 1 : cy) * cs - y0) / dy : Infinity;
+    const tDeltaX = dx !== 0 ? cs / Math.abs(dx) : Infinity;
+    const tDeltaY = dy !== 0 ? cs / Math.abs(dy) : Infinity;
+
+    let walls = 0;
+    const maxSteps = this.width + this.height + 2;
+    for (let step = 0; step < maxSteps; step++) {
+      if (tMaxX < tMaxY) {
+        cx += stepX;
+        tMaxX += tDeltaX;
+      } else {
+        cy += stepY;
+        tMaxY += tDeltaY;
+      }
+
+      if (this.isWall(cx, cy)) walls++;
+      if (cx === endX && cy === endY) break;
+      if (tMaxX > 1 && tMaxY > 1) break;
+    }
+    return walls;
+  }
+
   /** Every open cell index. Used by the spawner to place things. */
   collectOpenCells(out: number[] = []): number[] {
     out.length = 0;

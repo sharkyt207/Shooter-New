@@ -64,8 +64,54 @@ export const ENEMIES = {
     preferredRange: 11,
     fleeHealthFraction: 0,
     lootTableId: 'loot_drop_order',
+    // The Order fights as a unit: when the player takes cover, they answer it.
+    throwableItemId: 'itm_thr_frag',
     xp: 110,
     visual: 'actor.order_runner',
+  },
+
+  /**
+   * The Warden.
+   *
+   * Guards a rift core and never leaves it far. Deliberately not a damage
+   * sponge: the fight changes shape three times, and each phase asks a
+   * different question of the player.
+   */
+  enm_warden: {
+    id: 'enm_warden',
+    name: 'Wächter',
+    faction: 'wardens',
+    health: 620,
+    moveSpeed: 2.2,
+    chaseSpeedFactor: 1.1,
+    radius: 0.62,
+    armorClass: 5,
+    perception: {
+      visionRange: 21,
+      visionConeDeg: 120,
+      hearingRange: 24,
+      awarenessSeconds: 0.25,
+      memorySeconds: 14,
+    },
+    weaponId: 'wpn_warden_lance',
+    accuracy: 0.72,
+    attackCooldownSeconds: 1.6,
+    burstCount: 5,
+    preferredRange: 14,
+    fleeHealthFraction: 0,
+    lootTableId: 'loot_drop_warden',
+    throwableItemId: 'itm_thr_frag',
+    xp: 900,
+    isBoss: true,
+    phases: [
+      // Holds its ground and punishes anyone in the open.
+      { healthAbove: 0.6, speedMult: 0.85, cooldownMult: 1.15, accuracyBonus: 0, label: 'Wache' },
+      // Starts advancing: cover stops being permanent.
+      { healthAbove: 0.3, speedMult: 1.15, cooldownMult: 0.85, accuracyBonus: 0.08, label: 'Vorstoß' },
+      // Nothing held back.
+      { healthAbove: 0, speedMult: 1.45, cooldownMult: 0.6, accuracyBonus: 0.15, label: 'Entfesselt' },
+    ],
+    visual: 'actor.warden',
   },
 } as const satisfies Record<string, EnemyDef>;
 

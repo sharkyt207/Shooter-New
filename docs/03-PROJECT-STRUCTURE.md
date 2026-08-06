@@ -55,6 +55,7 @@ Shooter-New/
 │   │   ├── enemies.ts             # Gegner-Archetypen
 │   │   ├── lootTables.ts          # Gewichtete Loot-Tabellen
 │   │   ├── attachments.ts         # Waffenaufsätze mit Stat-Deltas
+│   │   ├── factions.ts            # Fraktionen und Feindschaftstabelle
 │   │   ├── throwables.ts          # Wurfgeschosse
 │   │   ├── biomes.ts              # Fragment-Typen + Container-Definitionen
 │   │   ├── baseModules.ts         # Basisgebäude, Ausbaustufen, Crafting-Rezepte
@@ -76,7 +77,7 @@ Shooter-New/
 │   │   ├── inventory/             # Container, Gewicht, Ausrüsten
 │   │   ├── loot/                  # Loot-Erzeugung und Aufnahme
 │   │   ├── enemies/               # Spawning, Archetypen-Instanziierung
-│   │   ├── ai/                    # Wahrnehmung, FSM, Steering
+│   │   ├── ai/                    # Wahrnehmung, FSM, Flow Fields, Squads
 │   │   ├── extraction/            # Zonen, Verfügbarkeit, Halte-Timer
 │   │   ├── map/                   # Fragment-Generator, Kollisionsgitter
 │   │   ├── base/                  # Basiszustand, Ausbau, Werkstatt

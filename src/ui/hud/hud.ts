@@ -47,6 +47,9 @@ export class Hud {
   private readonly aimStick: HTMLElement;
   private readonly aimKnob: HTMLElement;
   private readonly minimap: Minimap;
+  private readonly boss: HTMLElement;
+  private readonly bossName: HTMLElement;
+  private readonly bossBar: BarHandle;
 
   /** Cached values so the DOM is only touched on real change. */
   private last = {
@@ -106,6 +109,14 @@ export class Hud {
     this.aimKnob = el('div', { className: 'stick__knob' });
     this.aimStick = el('div', { className: 'stick stick--aim', children: [this.aimKnob] });
 
+    this.bossName = el('div', { className: 'subtitle' });
+    this.bossBar = bar('boss');
+    this.boss = el('div', {
+      className: 'hud__boss',
+      children: [this.bossName, this.bossBar.root],
+    });
+    this.boss.style.display = 'none';
+
     this.minimap = new Minimap(108);
 
     this.root = el('div', {
@@ -126,6 +137,7 @@ export class Hud {
           ],
         }),
         this.timer,
+        this.boss,
         this.minimap.root,
         el('div', {
           className: 'hud__topright',
@@ -199,6 +211,7 @@ export class Hud {
     this.updateAmmo(vm);
     this.updateTimer(vm);
     this.updateContext(vm);
+    this.updateBoss(vm);
     this.updateExtraction(vm);
     this.updateQuickUse(vm);
     this.updateThrowables(vm);
@@ -294,6 +307,25 @@ export class Hud {
     }
     this.contextBar.set(progress);
     this.contextBar.root.style.display = progress > 0 ? 'block' : 'none';
+  }
+
+  /**
+   * Boss bar.
+   *
+   * Only shown once the boss has actually engaged - a health bar for something
+   * the player has not met yet would give away that it is there.
+   */
+  private updateBoss(vm: HudViewModel): void {
+    if (!vm.boss) {
+      this.boss.style.display = 'none';
+      return;
+    }
+
+    this.boss.style.display = 'block';
+    const fraction = vm.boss.maxHealth > 0 ? vm.boss.health / vm.boss.maxHealth : 0;
+    this.bossBar.set(fraction);
+    const label = vm.boss.phase ? `${vm.boss.name} · ${vm.boss.phase}` : vm.boss.name;
+    if (this.bossName.textContent !== label) this.bossName.textContent = label;
   }
 
   private updateExtraction(vm: HudViewModel): void {

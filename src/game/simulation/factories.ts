@@ -186,6 +186,8 @@ export function createEnemy(
     // the same tick.
     perceptionTimer: 0,
     waitTimer: 0,
+    phaseLabel: '',
+    announced: false,
   });
 
   return entity;

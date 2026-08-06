@@ -23,8 +23,12 @@ import type { MapGrid } from '@/game/map/mapGrid';
 import { cloneLoadout, type Loadout } from '@/game/player/loadout';
 import { clearOneShots, copyIntent, createIntent, type PlayerIntent } from '@/game/player/playerIntent';
 import { totalValue } from '@/game/inventory/inventory';
+import { AI } from '@/content/balance';
+import type { FactionId } from '@/content/factions';
 import { aiSystem } from '@/game/ai/aiSystem';
+import { NavigationCache } from '@/game/ai/navigation';
 import { perceptionSystem } from '@/game/ai/perception';
+import { SquadRegistry } from '@/game/ai/squad';
 import { updateWeapons } from '@/game/weapons/firing';
 import {
   createAnomaly,
@@ -99,6 +103,8 @@ export class RaidSimulation {
       interactionTarget: null,
       entitiesInAnomaly: new Set<EntityId>(),
       meleeCooldown: 0,
+      navigation: new NavigationCache(this.grid),
+      squads: new SquadRegistry(),
       pendingOutcome: null,
       extractedZoneName: null,
     };
@@ -130,6 +136,11 @@ export class RaidSimulation {
 
   get interactionTarget() {
     return this.ctx.interactionTarget;
+  }
+
+  /** Squad blackboards. Read-only from outside the simulation. */
+  get squads(): SquadRegistry {
+    return this.ctx.squads;
   }
 
   /** Feed the current input state. Safe to call many times between ticks. */
@@ -191,6 +202,8 @@ export class RaidSimulation {
   dispose(): void {
     this.bus.clear();
     this.world.reset();
+    this.ctx.navigation.clear();
+    this.ctx.squads.clear();
   }
 
   // ── Setup ────────────────────────────────────────────────────────────────
@@ -199,9 +212,7 @@ export class RaidSimulation {
     const spawn = this.map.playerSpawn;
     createPlayer(this.world, this.loadout, spawn.x, spawn.y);
 
-    for (const enemy of this.map.enemies) {
-      createEnemy(this.world, enemy.enemyId, enemy.x, enemy.y);
-    }
+    this.spawnEnemies();
     for (const container of this.map.containers) {
       createContainer(this.world, container.containerId, container.x, container.y);
     }
@@ -210,6 +221,64 @@ export class RaidSimulation {
     }
     for (const anomaly of this.map.anomalies) {
       createAnomaly(this.world, anomaly.kind, anomaly.x, anomaly.y, anomaly.radius);
+    }
+  }
+
+  /**
+   * Spawn enemies and group them into squads.
+   *
+   * Grouping is spatial and per faction: enemies that start near each other
+   * fight together. That is deliberately simple - the interesting behaviour
+   * comes from the shared blackboard, not from clever grouping.
+   */
+  private spawnEnemies(): void {
+    interface PendingSquad {
+      faction: FactionId;
+      squad: ReturnType<SquadRegistry['create']>;
+      anchorX: number;
+      anchorY: number;
+    }
+    const pending: PendingSquad[] = [];
+
+    for (const spawn of this.map.enemies) {
+      const entity = createEnemy(this.world, spawn.enemyId, spawn.x, spawn.y);
+      if (entity === null) continue;
+
+      const faction = this.world.factions.get(entity);
+      if (!faction) continue;
+
+      // A boss always gets its own squad: it never takes orders and never
+      // takes a supporting role.
+      if (spawn.isBoss) {
+        const solo = this.ctx.squads.create(faction.id);
+        solo.members.push(entity);
+        this.world.squadMembers.set(entity, { squadId: solo.id, role: 'assault', throwCooldown: 0 });
+        continue;
+      }
+
+      let joined = pending.find(
+        (candidate) =>
+          candidate.faction === faction.id &&
+          candidate.squad.members.length < AI.maxSquadSize &&
+          Math.hypot(candidate.anchorX - spawn.x, candidate.anchorY - spawn.y) <= AI.squadGroupRadius,
+      );
+
+      if (!joined) {
+        joined = {
+          faction: faction.id,
+          squad: this.ctx.squads.create(faction.id),
+          anchorX: spawn.x,
+          anchorY: spawn.y,
+        };
+        pending.push(joined);
+      }
+
+      joined.squad.members.push(entity);
+      this.world.squadMembers.set(entity, {
+        squadId: joined.squad.id,
+        role: 'assault',
+        throwCooldown: 0,
+      });
     }
   }
 

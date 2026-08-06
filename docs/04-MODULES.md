@@ -34,6 +34,7 @@ Legende Reifegrad: 🟢 Prototyp fertig · 🟡 Grundgerüst · ⚪ geplant
 | `content/enemies` | Gegner-Archetypen: Stats, Wahrnehmung, Verhalten, Loot | 🟢 |
 | `content/lootTables` | Gewichtete Tabellen pro Containertyp und Biom | 🟢 |
 | `content/attachments` | Waffenaufsätze mit Stat-Deltas | 🟢 |
+| `content/factions` | Fraktionen, symmetrische Feindschaftstabelle, Doktrin | 🟢 |
 | `content/throwables` | Splitterladung, Blender, Echo-Köder | 🟢 |
 | `content/biomes` | Fragment-Typen der Echo-Welt (Labor, Wald, Station, …) | 🟢 |
 | `content/baseModules` | Basisgebäude, Ausbaustufen, Kosten, Freischaltungen, Crafting-Rezepte | 🟡 |
@@ -83,7 +84,15 @@ Loot-Erzeugung aus gewichteten Tabellen, Bodenloot, Container-Zustände, Aufnahm
 Spawn-Steuerung nach Biom und Raid-Fortschritt, Instanziierung von Archetypen.
 
 ### `game/ai` 🟢
-Wahrnehmung (Sichtkegel + Sichtlinie + Gehör) und Verhaltens-FSM:
+Wahrnehmung, Verhaltens-FSM, Flow-Field-Navigation und Squad-Koordination.
+
+- `navigation` — Flow Fields mit geteiltem Cache; garantiert einen Weg, wenn
+  einer existiert, und schneidet keine Wandecken
+- `squad` — gemeinsames Blackboard, Rollenverteilung nach Fraktionsdoktrin
+- `perception` — alle feindlichen Fraktionen als Kandidaten, Hören mit
+  Materialdämpfung
+
+Verhaltens-FSM:
 
 ```
 IDLE ──sieht/hört──► INVESTIGATE ──sieht──► CHASE ──in Reichweite──► ATTACK
@@ -176,6 +185,8 @@ Der Rest des Spiels kennt nur das Interface.
 | Neues Wurfgeschoss | 1 Eintrag in `content/throwables.ts` + 1 Item |
 | Neuer Gegnertyp | 1 Eintrag in `content/enemies.ts` (+ optional neuer AI-Zustand) |
 | Neues Biom | 1 Eintrag in `content/biomes.ts` |
+| Neuer Boss | 1 Eintrag in `content/enemies.ts` mit `phases` und `isBoss` |
+| Fraktion verfeinden | 1 Zeile in `content/factions.ts` |
 | Neues Basisgebäude | 1 Eintrag in `content/baseModules.ts` |
 | Canva-Assets ersetzen | Nur `public/assets/manifest.json` + Dateien — **null Code** |
 | Renderer tauschen | Nur `render/**` neu schreiben. `game/**` bleibt unberührt. |

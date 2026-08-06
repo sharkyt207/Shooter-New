@@ -177,6 +177,40 @@ export const AI = {
   turnRateDeg: 220,
   /** Noise made by an enemy firing, in metres, alerting its allies. */
   allyAlertRadius: 16,
+
+  // ── M3: squads, navigation, hearing ──────────────────────────────────────
+  /** Ticks a squad acts on what it last knew before treating it as stale. */
+  squadMemoryTicks: 60 * 12,
+  /** Metres a flanker swings out to the side of the target. */
+  flankOffset: 7,
+  /** Metres squad mates try to keep between each other. */
+  separationRadius: 1.6,
+  /** Strength of the separation push, 0..1. */
+  separationStrength: 0.55,
+  /** Maximum enemies grouped into one squad. */
+  maxSquadSize: 4,
+  /** Metres within which spawned enemies of one faction form a squad. */
+  squadGroupRadius: 14,
+
+  /**
+   * Fraction of a sound that survives each wall it passes through.
+   * Two walls leave a quarter of the radius - which is what makes a suppressor
+   * plus a corner genuinely quiet.
+   */
+  wallSoundDamping: 0.5,
+  /** Walls beyond this count block a sound entirely. */
+  maxWallsHeard: 4,
+
+  /** Seconds without line of sight before an enemy considers a grenade. */
+  grenadeAfterBlindSeconds: 2.2,
+  /** Seconds between grenade attempts per enemy. */
+  grenadeCooldownSeconds: 14,
+  /** Metres: closer than this and the enemy would catch its own blast. */
+  grenadeMinRange: 5,
+  grenadeMaxRange: 15,
+
+  /** How far a suppressing enemy stays back, as a factor of preferred range. */
+  suppressRangeFactor: 1.25,
 } as const;
 
 export const RAID = {
@@ -209,6 +243,12 @@ export const MAP = {
   seamCells: 4,
   /** Minimum number of open cells a fragment must have to be usable. */
   minOpenCells: 120,
+  /**
+   * Chance a raid contains a Warden.
+   * Not every raid: a boss in every rift would make it routine rather than an
+   * event worth telling someone about.
+   */
+  wardenChance: 0.35,
 } as const;
 
 export const LOOT = {

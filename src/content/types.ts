@@ -233,6 +233,24 @@ export interface PerceptionDef {
   memorySeconds: number;
 }
 
+/**
+ * A boss phase.
+ *
+ * Phases are checked from the top down; the first whose `healthAbove` the boss
+ * is still over applies. They are what turn a large health pool into a fight
+ * with a shape.
+ */
+export interface EnemyPhase {
+  /** Health fraction above which this phase applies. */
+  healthAbove: number;
+  speedMult: number;
+  cooldownMult: number;
+  /** Added to the archetype's accuracy, before clamping. */
+  accuracyBonus: number;
+  /** Short label for the HUD banner. */
+  label: string;
+}
+
 export interface EnemyDef {
   id: string;
   name: string;
@@ -260,6 +278,12 @@ export interface EnemyDef {
   fleeHealthFraction: number;
   /** Loot table rolled on death. */
   lootTableId: string;
+  /** Throwable this archetype will use against a target in cover. */
+  throwableItemId?: string;
+  /** Boss phases, top down. Omitted for ordinary enemies. */
+  phases?: readonly EnemyPhase[];
+  /** Marks an archetype that gets a HUD banner and a health bar. */
+  isBoss?: boolean;
   /** Experience awarded to the player. */
   xp: number;
   visual: string;

@@ -7,6 +7,7 @@
  */
 
 import { RAID } from '@/content/balance';
+import { findEnemy } from '@/content/enemies';
 import { findItem } from '@/content/items';
 import { findWeapon } from '@/content/weapons';
 import type { ExtractionPhase } from '@/game/components';
@@ -77,6 +78,9 @@ export interface HudViewModel {
   playerY: number;
   playerRotation: number;
 
+  /** Live boss, once it has engaged. Null the rest of the time. */
+  boss: { name: string; health: number; maxHealth: number; phase: string } | null;
+
   zones: HudZone[];
   inventory: HudItem[];
   /** Consumables, surfaced as quick-use buttons in the HUD. */
@@ -115,6 +119,7 @@ const EMPTY: HudViewModel = {
   playerX: 0,
   playerY: 0,
   playerRotation: 0,
+  boss: null,
   zones: [],
   inventory: [],
   consumables: [],
@@ -202,6 +207,7 @@ export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
     playerY: transform?.y ?? 0,
     playerRotation: transform?.rotation ?? 0,
 
+    boss: findEngagedBoss(sim),
     zones,
     inventory: inventory ? toHudItems(inventory.slots) : [],
     consumables: inventory
@@ -221,6 +227,26 @@ export function buildHudViewModel(sim: RaidSimulation): HudViewModel {
 function reserveAmmoFor(inventory: InventoryState | undefined, ammoItemId: string | null): number {
   if (!inventory || !ammoItemId) return 0;
   return countItem(inventory, ammoItemId);
+}
+
+/** The boss that has engaged the player, if one is alive. */
+function findEngagedBoss(sim: RaidSimulation): HudViewModel['boss'] {
+  for (const [entity, agent] of sim.world.agents.entries()) {
+    if (!agent.announced) continue;
+    const def = findEnemy(agent.enemyId);
+    if (!def?.isBoss) continue;
+
+    const health = sim.world.healths.get(entity);
+    if (!health || health.current <= 0) continue;
+
+    return {
+      name: def.name,
+      health: health.current,
+      maxHealth: health.max,
+      phase: agent.phaseLabel,
+    };
+  }
+  return null;
 }
 
 export function toHudItems(slots: readonly InventorySlot[]): HudItem[] {

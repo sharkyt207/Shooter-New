@@ -658,6 +658,18 @@ export class WorldRenderer {
 
       g.circle(screen.x, screen.y, 8).stroke({ width: 2, color });
 
+      // Squad role, so group behaviour is readable while tuning it.
+      const member = sim.world.squadMembers.get(entity);
+      if (member) {
+        const roleColor =
+          member.role === 'flank'
+            ? PALETTE.rare
+            : member.role === 'suppress'
+              ? PALETTE.echo
+              : PALETTE.bone;
+        g.circle(screen.x, screen.y, 12).stroke({ width: 1, color: roleColor, alpha: 0.8 });
+      }
+
       if (agent.target !== null) {
         const target = sim.world.transforms.get(agent.target);
         if (target) {

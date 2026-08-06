@@ -14,8 +14,8 @@ erst dann das nächste. Kein paralleles Anfangen von Baustellen.
 | **M0** | Fundament | Toolchain, Architektur, Core-Layer, Boundary-Check | ✅ abgeschlossen |
 | **M1** | Vertical Slice / Prototyp | Spielbarer Raid-Loop End-to-End | ✅ abgeschlossen |
 | **M2** | Kampf & Waffen in Tiefe | Munitionstypen, Panzerungsklassen, Trefferzonen, Aufsätze, Wurfgeschosse, Nahkampf | ✅ abgeschlossen |
-| **M3** | Gegner & KI in Tiefe | Fraktionsverhalten, Squads, Bosse, Hören/Sehen | 🔜 als nächstes |
-| **M4** | Welt & Anomalien | Fragment-Generator v2, alle 5 Anomalien, Wetter/Licht | ⏳ geplant |
+| **M3** | Gegner & KI in Tiefe | Flow-Field-Navigation, Fraktionskrieg, Squads, Wächter-Boss | ✅ abgeschlossen |
+| **M4** | Welt & Anomalien | Fragment-Generator v2, alle 5 Anomalien, Wetter/Licht | 🔜 als nächstes |
 | **M5** | Meta: Basis, Crafting, Economy | Basisausbau, Werkbänke, Händler, Schwarzmarkt | ⏳ geplant |
 | **M6** | Mobile-Härtung | Capacitor, iOS-Build, Performance-Pass, Touch-Politur | ⏳ geplant |
 | **M7** | Content & Art-Pass | Finale Assets, Audio, Onboarding, Lokalisierung | ⏳ geplant |
@@ -89,24 +89,42 @@ Zielversatz gegen den Daumen des Spielers arbeiten; das lässt sich ohne Test au
 echter Hardware nicht seriös tunen (M6). Bis dahin bleibt Rückstoß als
 Streuungsaufbau modelliert, gedämpft durch Ergonomie.
 
-## M3 — Gegner & KI (nächster Schritt)
+## M3 — Gegner & KI ✅
 
-- Squad-Koordination (Flankieren, Deckungsfeuer, Rückzug)
-- Fraktionsspezifische Profile & Beziehungen untereinander
-- Hörsystem mit Materialdämpfung, Schalldämpfer-Interaktion
-- Boss: „Wächter" mit Phasen und einzigartigem Loot
-- Nav-Grid mit Flow-Fields statt naivem Steering
-- Fraktions-Feindschaft: Streuner und Orden bekämpfen einander
-- Gegner nutzen die M2-Werkzeuge selbst (Granaten, unterschiedliche Munition)
-- **Doku:** `docs/modules/ai.md`
+**Leitgedanke:** Die Welt hört auf, sich um den Spieler zu drehen.
 
-## M4 — Welt & Anomalien
+- [x] **Flow-Field-Navigation** statt naivem Steering — behebt einen echten
+      Mangel: Gegner blieben an jeder einspringenden Ecke hängen, bis ihr
+      Zustands-Timeout griff
+- [x] Fraktionsbeziehungen mit symmetrischer Tabelle; Streuner und Orden
+      bekämpfen einander tatsächlich, ob jemand zusieht oder nicht
+- [x] Squad-Koordination über ein gemeinsames Blackboard: Rollen (assault,
+      suppress, flank), Separation, geteiltes Lagebild
+- [x] Doktrin je Fraktion steuert die Taktik (Orden flankiert methodisch,
+      Streuner halten Abstand, Verwobene stürmen alle)
+- [x] Hörsystem mit Materialdämpfung — halbiert pro durchquerter Wand und lässt
+      damit den Schalldämpfer aus M2 endlich zahlen
+- [x] Gegner werfen Granaten auf ein Ziel in Deckung: hinter einer Wand zu
+      stehen wird von einer Lösung zu einem Timer
+- [x] Boss „Wächter" mit drei Phasen, Rüstungsklasse 5 und exklusivem Loot;
+      erscheint in 35 % der Raids, weit vom Spawn
+- [x] **Doku:** `docs/modules/ai.md`
+
+**Gemessen:** 0,097 ms pro Sim-Tick bei 23 Gegnern und 10 Squads (Budget 3,0 ms).
+
+**Bewusst verschoben:** Deckungspunkte. Gegner suchen Abstand, aber keine
+Deckung — das braucht eine Sichtbarkeitsanalyse der Karte und lohnt erst mit den
+handgebauten Raum-Prefabs aus M4.
+
+## M4 — Welt & Anomalien (nächster Schritt)
 
 - Fragment-Generator v2: handgebaute Räume als Prefabs, prozedural verkettet
 - Alle 5 Anomalien mit Gameplay-Wirkung und VFX
 - Dynamisches Licht: Tag/Nacht, Sturm, Riss-Puls, Taschenlampe mit Sichtkegel
 - Türen, Schlösser, Schlüsselkarten, verschlossene Hochwert-Räume
 - Wetter mit Sicht-/Audio-Auswirkung
+- KI-Reaktion auf Anomalien (Gegner laufen aktuell ungerührt hindurch)
+- Deckungspunkte auf Basis der Raum-Prefabs
 - **Doku:** `docs/modules/map.md`, `docs/modules/anomalies.md`
 
 ## M5 — Meta-Progression

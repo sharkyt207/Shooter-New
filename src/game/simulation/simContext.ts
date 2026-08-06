@@ -9,10 +9,12 @@
 import type { EventBus } from '@/core/events/eventBus';
 import type { RandomStreams } from '@/core/math/random';
 import type { EntityId } from '@/core/ecs/entity';
-import type { FactionId } from '@/game/components';
+import type { FactionId } from '@/content/factions';
 import type { GameEvents, RaidOutcomeKind } from '@/game/gameEvents';
 import type { MapGrid } from '@/game/map/mapGrid';
 import type { PlayerIntent } from '@/game/player/playerIntent';
+import type { NavigationCache } from '@/game/ai/navigation';
+import type { SquadRegistry } from '@/game/ai/squad';
 import type { RaidWorld } from './raidWorld';
 
 /**
@@ -63,6 +65,11 @@ export interface SimContext {
 
   /** Seconds until the player may swing again. */
   meleeCooldown: number;
+
+  /** Shared flow fields for enemy navigation (M3). */
+  readonly navigation: NavigationCache;
+  /** Squad blackboards (M3). */
+  readonly squads: SquadRegistry;
 
   /** Set by a system to end the raid. Consumed by the simulation. */
   pendingOutcome: RaidOutcomeKind | null;

@@ -84,7 +84,8 @@ Laufzeit-Abhängigkeiten: **genau eine** (`pixi.js`). Begründung: [ADR-012](doc
 
 ## Status
 
-**M0 Fundament** ✅ · **M1 Prototyp** ✅ · **M2 Kampf & Waffen** ✅ · **M3 Gegner & KI** 🔜
+**M0 Fundament** ✅ · **M1 Prototyp** ✅ · **M2 Kampf & Waffen** ✅ ·
+**M3 Gegner & KI** ✅ · **M4 Welt & Anomalien** 🔜
 Details: [Roadmap](docs/02-ROADMAP.md)
 
 ---

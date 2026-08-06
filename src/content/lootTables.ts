@@ -107,6 +107,27 @@ export const LOOT_TABLES = {
       { itemId: 'itm_wpn_nadel', weight: 3, minQuantity: 1, maxQuantity: 1 },
     ],
   },
+  /**
+   * Warden drop.
+   *
+   * The only reliable source of rift cores. Killing one has to be worth the
+   * ammunition, the risk and the noise it makes.
+   */
+  loot_drop_warden: {
+    id: 'loot_drop_warden',
+    rolls: { min: 4, max: 6 },
+    emptyChance: 0,
+    entries: [
+      { itemId: 'itm_echoshard', weight: 24, minQuantity: 3, maxQuantity: 7 },
+      { itemId: 'itm_ammo_74_ap', weight: 20, minQuantity: 15, maxQuantity: 40 },
+      { itemId: 'itm_datacore', weight: 16, minQuantity: 1, maxQuantity: 3 },
+      { itemId: 'itm_risscore', weight: 12, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'itm_armor_plate', weight: 10, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'itm_helmet_shell', weight: 9, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'itm_att_muzzle_suppressor', weight: 5, minQuantity: 1, maxQuantity: 1 },
+      { itemId: 'itm_wpn_nadel', weight: 4, minQuantity: 1, maxQuantity: 1 },
+    ],
+  },
 } as const satisfies Record<string, LootTableDef>;
 
 export type LootTableId = keyof typeof LOOT_TABLES;

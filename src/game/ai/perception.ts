@@ -7,23 +7,28 @@
  * without it, being seen and being shot are the same instant, and stealth
  * stops being a real option (Pillar P3).
  *
+ * Since M3 the player is no longer the only thing worth looking at: every
+ * hostile faction is a candidate, so a scavenger band and an Order patrol will
+ * find and fight each other whether or not anyone is watching.
+ *
  * Perception is the most expensive AI work, so it runs on a stagger: each
  * enemy re-evaluates roughly every `perceptionIntervalSeconds`, not every tick.
  */
 
 import { AI } from '@/content/balance';
 import { findEnemy } from '@/content/enemies';
+import { isHostile, playerThreatBias } from '@/content/factions';
 import type { EntityId } from '@/core/ecs/entity';
 import { DEG_TO_RAD } from '@/core/math/scalar';
 import { isInCone } from '@/core/math/shapes';
 import type { SimContext } from '@/game/simulation/simContext';
+import { reportContact, reportNoise } from './squad';
 
 const scratchPoint = { x: 0, y: 0 };
 const scratchIds: EntityId[] = [];
 
 export function perceptionSystem(ctx: SimContext): void {
   const { world, dt } = ctx;
-  const player = world.playerEntity;
 
   world.agents.keyArray(scratchIds);
 
@@ -45,8 +50,6 @@ export function perceptionSystem(ctx: SimContext): void {
       continue;
     }
 
-    // Hearing is cheap and time-critical (a gunshot must register immediately),
-    // so it is checked every tick regardless of the stagger.
     checkHearing(ctx, entity, agent);
 
     if (agent.perceptionTimer > 0) continue;
@@ -54,45 +57,35 @@ export function perceptionSystem(ctx: SimContext): void {
     // all landing on the same one.
     agent.perceptionTimer = AI.perceptionIntervalSeconds + (entity % 5) * 0.006;
 
-    if (player === null || !world.isAliveActor(player)) {
-      agent.awareness = Math.max(0, agent.awareness - dt);
-      continue;
-    }
+    // Drop a target that died or vanished.
+    if (agent.target !== null && !world.isAliveActor(agent.target)) agent.target = null;
 
     const def = findEnemy(agent.enemyId);
-    if (!def) continue;
-
     const self = world.transforms.get(entity);
-    const targetTransform = world.transforms.get(player);
-    if (!self || !targetTransform) continue;
+    const faction = world.factions.get(entity);
+    if (!def || !self || !faction) continue;
 
-    scratchPoint.x = targetTransform.x;
-    scratchPoint.y = targetTransform.y;
+    const best = findVisibleTarget(ctx, entity, faction.id, self, def);
 
-    const inCone = isInCone(
-      self.x,
-      self.y,
-      self.rotation,
-      def.perception.visionConeDeg * 0.5 * DEG_TO_RAD,
-      def.perception.visionRange,
-      scratchPoint,
-    );
-
-    const visible =
-      inCone && ctx.grid.hasLineOfSight(self.x, self.y, targetTransform.x, targetTransform.y);
-
-    if (visible) {
+    if (best !== null) {
+      const targetTransform = world.transforms.require(best);
       agent.awareness += AI.perceptionIntervalSeconds;
       agent.lastKnownX = targetTransform.x;
       agent.lastKnownY = targetTransform.y;
       agent.timeSinceSeen = 0;
 
       if (agent.awareness >= def.perception.awarenessSeconds) {
-        if (agent.target === null) {
+        const isNewContact = agent.target === null;
+        agent.target = best;
+
+        if (isNewContact) {
           ctx.bus.emit('ai:alerted', { entity, x: self.x, y: self.y });
-          alertNearbyAllies(ctx, entity, self.x, self.y, targetTransform.x, targetTransform.y);
         }
-        agent.target = player;
+
+        // Knowledge travels through the squad rather than by proximity.
+        const member = world.squadMembers.get(entity);
+        const squad = member ? ctx.squads.get(member.squadId) : undefined;
+        if (squad) reportContact(ctx, squad, best, targetTransform.x, targetTransform.y);
       }
     } else {
       agent.awareness = Math.max(0, agent.awareness - AI.perceptionIntervalSeconds * 0.6);
@@ -110,69 +103,115 @@ export function hasEyesOnTarget(ctx: SimContext, entity: EntityId): boolean {
   return agent.timeSinceSeen < 0.25;
 }
 
+/**
+ * The most pressing visible hostile, or null.
+ *
+ * Scoring, not "first found": distance decides, with the player weighted more
+ * heavily for everyone except the Wardens - who care about whoever is closest
+ * to what they guard. Without that bias the player could stroll through a
+ * firefight unnoticed, which is funny once and broken thereafter.
+ */
+function findVisibleTarget(
+  ctx: SimContext,
+  self: EntityId,
+  selfFaction: string,
+  transform: { x: number; y: number; rotation: number },
+  def: NonNullable<ReturnType<typeof findEnemy>>,
+): EntityId | null {
+  const halfCone = def.perception.visionConeDeg * 0.5 * DEG_TO_RAD;
+  const bias = playerThreatBias(selfFaction as never);
+
+  let best: EntityId | null = null;
+  let bestScore = Infinity;
+
+  for (const [candidate, faction] of ctx.world.factions.entries()) {
+    if (candidate === self) continue;
+    if (!isHostile(selfFaction as never, faction.id)) continue;
+
+    const health = ctx.world.healths.get(candidate);
+    if (!health || health.current <= 0) continue;
+
+    const other = ctx.world.transforms.get(candidate);
+    if (!other) continue;
+
+    scratchPoint.x = other.x;
+    scratchPoint.y = other.y;
+    if (!isInCone(transform.x, transform.y, transform.rotation, halfCone, def.perception.visionRange, scratchPoint)) {
+      continue;
+    }
+    if (!ctx.grid.hasLineOfSight(transform.x, transform.y, other.x, other.y)) continue;
+
+    const distance = Math.hypot(other.x - transform.x, other.y - transform.y);
+    const score = ctx.world.players.has(candidate) ? distance / bias : distance;
+    if (score < bestScore) {
+      bestScore = score;
+      best = candidate;
+    }
+  }
+
+  return best;
+}
+
+/**
+ * Hearing, with walls muffling sound.
+ *
+ * A sound does not stop at a wall, it is attenuated by it. Counting the walls
+ * a straight line crosses is a cheap, deterministic stand-in for real acoustic
+ * propagation, and it is what finally makes the M2 suppressor pay off: half the
+ * emitted radius, halved again per wall.
+ */
 function checkHearing(
   ctx: SimContext,
   entity: EntityId,
-  agent: { enemyId: string; lastKnownX: number; lastKnownY: number; target: EntityId | null; timeSinceSeen: number },
+  agent: {
+    enemyId: string;
+    lastKnownX: number;
+    lastKnownY: number;
+    target: EntityId | null;
+    timeSinceSeen: number;
+  },
 ): void {
   if (ctx.noises.length === 0) return;
 
   const def = findEnemy(agent.enemyId);
   const self = ctx.world.transforms.get(entity);
-  if (!def || !self) return;
-
   const faction = ctx.world.factions.get(entity);
+  if (!def || !self || !faction) return;
 
   for (const noise of ctx.noises) {
-    if (faction && noise.faction === faction.id) continue;
     if (noise.source === entity) continue;
+    // Allies making noise is not information worth investigating.
+    if (noise.faction === faction.id) continue;
 
     const dx = noise.x - self.x;
     const dy = noise.y - self.y;
-    const distSq = dx * dx + dy * dy;
+    const distance = Math.hypot(dx, dy);
 
-    // A sound is heard when the listener is inside its radius AND within the
-    // enemy's own hearing range - loud sounds carry, deaf enemies still miss them.
-    const audibleRange = Math.min(noise.radius, def.perception.hearingRange);
-    if (distSq > audibleRange * audibleRange) continue;
+    const audible = audibleRadius(ctx, noise.radius, noise.x, noise.y, self.x, self.y);
+    if (distance > Math.min(audible, def.perception.hearingRange)) continue;
 
     agent.lastKnownX = noise.x;
     agent.lastKnownY = noise.y;
-    // Heard, not seen: the enemy investigates the position but has not
-    // acquired a target yet.
     if (agent.target === null) agent.timeSinceSeen = Math.min(agent.timeSinceSeen, 0.5);
+
+    const member = ctx.world.squadMembers.get(entity);
+    const squad = member ? ctx.squads.get(member.squadId) : undefined;
+    if (squad) reportNoise(ctx, squad, noise.x, noise.y);
     return;
   }
 }
 
-/** A confirmed sighting is shouted to nearby allies of the same faction. */
-function alertNearbyAllies(
+/** Effective radius of a sound after passing through geometry. */
+export function audibleRadius(
   ctx: SimContext,
-  origin: EntityId,
-  x: number,
-  y: number,
-  targetX: number,
-  targetY: number,
-): void {
-  const faction = ctx.world.factions.get(origin);
-  if (!faction) return;
-
-  const radiusSq = AI.allyAlertRadius * AI.allyAlertRadius;
-
-  for (const [entity, agent] of ctx.world.agents.entries()) {
-    if (entity === origin) continue;
-    const otherFaction = ctx.world.factions.get(entity);
-    if (!otherFaction || otherFaction.id !== faction.id) continue;
-
-    const transform = ctx.world.transforms.get(entity);
-    if (!transform) continue;
-
-    const dx = transform.x - x;
-    const dy = transform.y - y;
-    if (dx * dx + dy * dy > radiusSq) continue;
-
-    agent.lastKnownX = targetX;
-    agent.lastKnownY = targetY;
-    agent.timeSinceSeen = Math.min(agent.timeSinceSeen, 1);
-  }
+  emittedRadius: number,
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+): number {
+  const walls = ctx.grid.countWallsBetween(fromX, fromY, toX, toY);
+  if (walls === 0) return emittedRadius;
+  if (walls > AI.maxWallsHeard) return 0;
+  return emittedRadius * Math.pow(AI.wallSoundDamping, walls);
 }
