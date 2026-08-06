@@ -1,0 +1,201 @@
+/**
+ * Every component type in the simulation.
+ *
+ * Components are plain data - no methods, no class instances, nothing that
+ * would not survive a JSON round-trip. That is what makes the world
+ * serialisable, testable and - later - transferable over a network.
+ *
+ * `prevX/prevY/prevRotation` exist so the renderer can interpolate between two
+ * simulation ticks (ADR-004). The simulation itself never reads them.
+ */
+
+import type { EntityId } from '@/core/ecs/entity';
+import type { InventoryState } from './inventory/inventory';
+
+export interface Transform {
+  x: number;
+  y: number;
+  rotation: number;
+  prevX: number;
+  prevY: number;
+  prevRotation: number;
+}
+
+export interface Velocity {
+  x: number;
+  y: number;
+}
+
+export interface Collider {
+  radius: number;
+  /** Static colliders never move and are skipped by the movement pass. */
+  isStatic: boolean;
+}
+
+export interface Health {
+  current: number;
+  max: number;
+  /** Tick of the most recent damage. Drives the grace period and UI flashes. */
+  lastDamageTick: number;
+  /** Entity that dealt the killing blow, set on death. */
+  lastAttacker: EntityId | null;
+}
+
+export type FactionId = 'player' | 'scavengers' | 'order' | 'weaved' | 'wardens';
+
+export interface Faction {
+  id: FactionId;
+}
+
+/** Marks the single player-controlled entity. */
+export interface PlayerTag {
+  /** Accumulated experience earned during this raid. */
+  raidXp: number;
+  kills: number;
+}
+
+export interface Stamina {
+  current: number;
+  max: number;
+  /** Seconds until regeneration resumes. */
+  regenDelay: number;
+}
+
+export interface WeaponState {
+  weaponId: string;
+  /** Rounds currently in the magazine. */
+  magazine: number;
+  /** Seconds until the weapon may fire again. */
+  cooldown: number;
+  /** Seconds remaining on the reload, 0 when not reloading. */
+  reloadRemaining: number;
+  /** Extra spread accumulated from sustained fire, in degrees. */
+  bloomDeg: number;
+}
+
+export interface Projectile {
+  owner: EntityId;
+  ownerFaction: FactionId;
+  damage: number;
+  /** Direction, always unit length. */
+  dirX: number;
+  dirY: number;
+  speed: number;
+  /** Metres travelled so far - used for range falloff and despawn. */
+  travelled: number;
+  effectiveRange: number;
+  maxRange: number;
+  minDamageFactor: number;
+  /** Seconds until forced despawn, a safety net against stuck projectiles. */
+  lifetime: number;
+}
+
+export type AiState = 'idle' | 'patrol' | 'investigate' | 'chase' | 'attack' | 'flee';
+
+export interface EnemyAgent {
+  enemyId: string;
+  state: AiState;
+  /** Seconds spent in the current state. */
+  stateTime: number;
+  target: EntityId | null;
+  /** Last position the target was seen or heard at. */
+  lastKnownX: number;
+  lastKnownY: number;
+  /** Seconds of continuous sight, compared against `awarenessSeconds`. */
+  awareness: number;
+  /** Seconds since the target was last seen. */
+  timeSinceSeen: number;
+  /** Anchor the enemy patrols around. */
+  homeX: number;
+  homeY: number;
+  /** Current movement destination. */
+  destX: number;
+  destY: number;
+  /** Seconds until the next burst may start. */
+  attackCooldown: number;
+  /** Rounds left in the current burst. */
+  burstRemaining: number;
+  /** Staggers expensive perception checks across enemies. */
+  perceptionTimer: number;
+  /** Seconds to wait before choosing the next patrol point. */
+  waitTimer: number;
+}
+
+/** An item lying on the ground, ready to be picked up. */
+export interface LootDrop {
+  itemId: string;
+  quantity: number;
+  /** Tick the drop was created - used for the spawn animation. */
+  createdTick: number;
+}
+
+export interface ContainerState {
+  containerId: string;
+  /** Seconds of searching accumulated so far. */
+  searchProgress: number;
+  searched: boolean;
+  /** Rolled contents, revealed when the search completes. */
+  contents: Array<{ itemId: string; quantity: number }>;
+}
+
+export type ExtractionPhase = 'locked' | 'available' | 'closing' | 'closed' | 'used';
+
+export interface ExtractionZone {
+  zoneId: string;
+  name: string;
+  radius: number;
+  /** Simulation tick at which the zone opens / closes. */
+  opensAtTick: number;
+  closesAtTick: number;
+  phase: ExtractionPhase;
+  /** Seconds the player has held position, 0..extractionHoldSeconds. */
+  holdProgress: number;
+}
+
+export type AnomalyKind = 'stillness';
+
+export interface Anomaly {
+  kind: AnomalyKind;
+  radius: number;
+  /** Drives the visual pulse; advanced by the simulation so it stays deterministic. */
+  phase: number;
+}
+
+/**
+ * What the renderer should draw for this entity.
+ *
+ * This is a logical asset key, never a file path (ADR-008). It lives in the
+ * simulation because "this entity is a scavenger" is game data - resolving that
+ * key to a texture is the renderer's job alone.
+ */
+export interface Renderable {
+  assetKey: string;
+  /** Metres above ground, used for depth sorting and shadow scale. */
+  height: number;
+  /** Optional tint as 0xRRGGBB, for placeholder art and status effects. */
+  tint: number;
+}
+
+export interface Equipment {
+  weaponItemId: string | null;
+  armorItemId: string | null;
+  backpackItemId: string | null;
+  /** Remaining armor durability; 0 means the armor no longer protects. */
+  armorDurability: number;
+}
+
+export interface Carrier {
+  inventory: InventoryState;
+}
+
+/** Applied while an entity uses a consumable - it cannot fire or sprint. */
+export interface UsingItem {
+  itemId: string;
+  remaining: number;
+  total: number;
+}
+
+/** Transient marker so the renderer can flash an entity that was just hit. */
+export interface HitFlash {
+  remaining: number;
+}

@@ -1,0 +1,26 @@
+{
+  "name": "project-echo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PROJECT ECHO - Isometrischer Mobile-Extraction-Shooter",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "verify": "npm run check:boundaries && npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "pixi.js": "^8.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^5.7.2",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
+  }
+}

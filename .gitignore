@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-ssr/
+coverage/
+.vite/
+*.local
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+
+# Capacitor native projects (generated, added from M6)
+/ios/App/Pods/
+/android/.gradle/
+/android/app/build/
