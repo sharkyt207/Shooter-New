@@ -67,6 +67,7 @@ export class Hud {
     jammed: false,
     lightOn: false,
     weather: '',
+    stickRadius: -1,
   };
 
   private bannerTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -428,6 +429,13 @@ export class Hud {
   }
 
   private updateSticks(): void {
+    // Keep the drawn ring the same size as the one the input layer reads.
+    const radius = this.touch.stickRadius;
+    if (radius !== this.last.stickRadius) {
+      this.last.stickRadius = radius;
+      this.root.style.setProperty('--stick-radius', `${radius}px`);
+    }
+
     const visuals = this.touch.getVisuals();
     applyStick(this.moveStick, this.moveKnob, visuals.move);
     applyStick(this.aimStick, this.aimKnob, visuals.aim);
@@ -483,7 +491,14 @@ function applyStick(
  * Anything longer overflows the circle, and an overflowing HUD button reads as
  * broken rather than as informative.
  */
+/**
+ * A label that fits inside a 58 px circle on a phone.
+ *
+ * Six characters, measured on a real 844x390 viewport rather than guessed at:
+ * "Feldverband" at seven still spilled past the border, and a label that
+ * overflows its button reads as broken rather than as informative.
+ */
 function shortName(name: string): string {
   const firstWord = name.split(/[\s-]/)[0] ?? name;
-  return firstWord.length > 7 ? `${firstWord.slice(0, 6)}.` : firstWord;
+  return firstWord.length > 6 ? `${firstWord.slice(0, 5)}.` : firstWord;
 }

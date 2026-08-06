@@ -9,6 +9,10 @@
  * Left half of the screen moves, right half aims and fires. The split follows
  * the touch that started the gesture, so a thumb sliding across the midline
  * never switches roles mid-drag.
+ *
+ * Since M6 the stick radius scales with the screen instead of being a fixed
+ * number of pixels. A thumb sweep is a physical distance, not a pixel count:
+ * 90 px is comfortable on a phone and a twitch on a tablet.
  */
 
 import { INPUT } from '@/content/balance';
@@ -54,10 +58,32 @@ export class TouchInput implements InputSource {
   /** Mirrors the stick halves for left-handed players. */
   leftHanded = false;
 
+  /** Current stick radius in CSS pixels, derived from the viewport. */
+  private radiusPx: number = INPUT.stickRadiusPx;
+
   constructor(private readonly element: HTMLElement) {
     this.onPointerDown = this.onPointerDown.bind(this);
     this.onPointerMove = this.onPointerMove.bind(this);
     this.onPointerUp = this.onPointerUp.bind(this);
+  }
+
+  /**
+   * Recompute the stick radius for a new viewport.
+   *
+   * Driven by the short edge so the gesture stays the same physical size in
+   * landscape on a phone and on a tablet.
+   */
+  resize(width: number, height: number): void {
+    const shortEdge = Math.min(width, height);
+    this.radiusPx = Math.max(
+      INPUT.stickRadiusMinPx,
+      Math.min(INPUT.stickRadiusMaxPx, shortEdge * INPUT.stickRadiusFraction),
+    );
+  }
+
+  /** Read by the HUD so the drawn stick matches the one being read. */
+  get stickRadius(): number {
+    return this.radiusPx;
   }
 
   attach(): void {
@@ -195,7 +221,7 @@ export class TouchInput implements InputSource {
     const distance = Math.hypot(dx, dy);
     if (distance < 1e-3) return ZERO;
 
-    const normalized = Math.min(1, distance / INPUT.stickRadiusPx);
+    const normalized = Math.min(1, distance / this.radiusPx);
     if (normalized < INPUT.deadzone) return ZERO;
 
     const ramped = Math.min(
@@ -209,15 +235,15 @@ export class TouchInput implements InputSource {
   }
 
   private updateVisuals(): void {
-    applyVisual(this.visuals.move, this.moveStick);
-    applyVisual(this.visuals.aim, this.aimStick);
+    applyVisual(this.visuals.move, this.moveStick, this.radiusPx);
+    applyVisual(this.visuals.aim, this.aimStick, this.radiusPx);
   }
 }
 
 const ZERO = { x: 0, y: 0 } as const;
 const scratch = { x: 0, y: 0 };
 
-function applyVisual(visual: StickVisual, stick: ActiveStick | null): void {
+function applyVisual(visual: StickVisual, stick: ActiveStick | null, radiusPx: number): void {
   if (!stick) {
     visual.active = false;
     return;
@@ -226,7 +252,7 @@ function applyVisual(visual: StickVisual, stick: ActiveStick | null): void {
   const dx = stick.currentX - stick.originX;
   const dy = stick.currentY - stick.originY;
   const distance = Math.hypot(dx, dy);
-  const clamped = Math.min(distance, INPUT.stickRadiusPx);
+  const clamped = Math.min(distance, radiusPx);
   const scale = distance > 1e-3 ? clamped / distance : 0;
 
   visual.active = true;

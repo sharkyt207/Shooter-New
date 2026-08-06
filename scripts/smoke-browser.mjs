@@ -50,6 +50,55 @@ const browser = await chromium.launch(launchOptions);
 // Landscape phone proportions - the target form factor, not a desktop window.
 const page = await browser.newPage({ viewport: { width: 900, height: 480 } });
 
+/**
+ * A second pass on a real phone shape.
+ *
+ * 844x390 with a coarse pointer is an iPhone in landscape: the tightest
+ * aspect ratio the HUD ever has to survive, and the one nobody looks at
+ * because development happens on a desktop.
+ */
+async function phonePass() {
+  const context = await browser.newContext({
+    viewport: { width: 844, height: 390 },
+    deviceScaleFactor: 3,
+    hasTouch: true,
+    isMobile: true,
+  });
+  const phone = await context.newPage();
+  const phoneErrors = [];
+  phone.on('console', (msg) => {
+    if (msg.type() === 'error') phoneErrors.push(`console.error: ${msg.text()}`);
+  });
+  phone.on('pageerror', (error) => phoneErrors.push(`pageerror: ${error.message}`));
+
+  const tap = async (text) => {
+    const button = phone.locator(`button:has-text("${text}")`).first();
+    await button.waitFor({ state: 'visible', timeout: 15000 });
+    await button.click({ force: true });
+    await phone.waitForTimeout(700);
+  };
+
+  await phone.goto(URL_TARGET, { waitUntil: 'networkidle' });
+  await phone.waitForTimeout(1200);
+  await tap('Riss betreten');   // menu -> base
+  await tap('Ausrüstung wählen');
+  await tap('Riss betreten');   // loadout -> briefing
+  await tap('Riss betreten');   // briefing -> raid
+  await phone.waitForTimeout(1800);
+
+  // Drag a thumb, so the virtual stick is drawn at its real size.
+  await phone.touchscreen.tap(200, 300);
+  await phone.mouse.move(180, 250);
+  await phone.mouse.down();
+  await phone.mouse.move(240, 300, { steps: 6 });
+  await phone.screenshot({ path: `${SHOT_DIR}/12-phone-raid.png` });
+  await phone.mouse.up();
+  console.log(`  screenshot: ${SHOT_DIR}/12-phone-raid.png`);
+
+  await context.close();
+  return phoneErrors;
+}
+
 const errors = [];
 page.on('console', (msg) => {
   if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`);
@@ -139,6 +188,9 @@ try {
   await page.keyboard.press('Tab');
   await page.waitForTimeout(500);
   await shot('08-inventory');
+
+  console.log('  Telefon-Format 844x390');
+  errors.push(...(await phonePass()));
 
   const frames = await page.evaluate(
     () =>

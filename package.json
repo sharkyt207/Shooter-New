@@ -13,15 +13,29 @@
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke-browser.mjs",
     "check:boundaries": "node scripts/check-boundaries.mjs",
-    "verify": "npm run check:boundaries && npm run typecheck && npm test"
+    "verify": "npm run check:boundaries && npm run typecheck && npm test",
+    "measure": "node scripts/measure-frame.mjs",
+    "cap:sync": "npm run build && cap sync",
+    "cap:ios": "npm run build && cap sync ios && cap open ios",
+    "cap:android": "npm run build && cap sync android && cap open android"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/screen-orientation": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.3",
     "pixi.js": "^8.6.6"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "@types/node": "^26.1.2",
     "typescript": "^5.7.2",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }

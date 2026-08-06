@@ -42,11 +42,15 @@ import { SeededRandom } from '@/core/math/random';
 import { RaidSimulation } from '@/game/simulation/raidSimulation';
 import { createIntent, type PlayerIntent } from '@/game/player/playerIntent';
 import { secureCapacityKg } from '@/game/player/loadout';
+import { applyDisplayPreferences, bindLifecycle } from '@/platform/native/appLifecycle';
+import { createHaptics, NullHaptics, type HapticsService } from '@/platform/native/haptics';
+import { isTouchDevice } from '@/platform/native/nativeBridge';
 import { NullAudio, type AudioService } from '@/platform/audio/audioService';
 import { CompositeInput } from '@/platform/input/inputSource';
 import { KeyboardMouseInput } from '@/platform/input/keyboardMouseInput';
 import { TouchInput } from '@/platform/input/touchInput';
 import {
+  createStorage,
   LocalStorageAdapter,
   SAVE_KEY,
   type StorageAdapter,
@@ -98,7 +102,8 @@ export interface GameOptions {
 export class Game {
   private readonly app = new Application();
   private readonly ui: UiRoot;
-  private readonly storage: StorageAdapter;
+  private storage: StorageAdapter;
+  private haptics: HapticsService = new NullHaptics();
   private readonly audio: AudioService;
   private readonly states = new GameStateMachine();
   private readonly clock = new FixedClock();
@@ -126,6 +131,8 @@ export class Game {
 
   constructor(private readonly options: GameOptions) {
     this.ui = new UiRoot(options.uiContainer);
+    // A synchronous fallback so the field is never undefined; `start()` swaps in
+    // the best adapter this build can actually reach.
     this.storage = options.storage ?? new LocalStorageAdapter();
     this.audio = options.audio ?? new NullAudio();
   }
@@ -134,6 +141,12 @@ export class Game {
 
   async start(): Promise<void> {
     this.ui.showLoading('Riss wird kalibriert …');
+
+    // Native capabilities first: the save has to be read from the right place,
+    // and a landscape lock applied before the first layout pass.
+    if (!this.options.storage) this.storage = await createStorage();
+    this.haptics = await createHaptics();
+    await applyDisplayPreferences();
 
     await this.app.init({
       background: 0x080a0f,
@@ -164,6 +177,11 @@ export class Game {
 
     this.handleResize();
     window.addEventListener('resize', () => this.handleResize());
+    // iOS fires `orientationchange` before the viewport metrics settle, so the
+    // layout is recomputed once more on the next frame.
+    window.addEventListener('orientationchange', () => {
+      requestAnimationFrame(() => this.handleResize());
+    });
 
     this.app.ticker.add((ticker) => this.frame(ticker.deltaMS / 1000));
 
@@ -583,6 +601,7 @@ export class Game {
     sim.bus.on('extraction:opened', (event) => {
       this.hud?.showBanner(`${event.name} offen`);
       this.audio.play('extraction.open');
+      this.haptics.impact('light');
     });
 
     sim.bus.on('extraction:closing', (event) => {
@@ -597,6 +616,9 @@ export class Game {
       if (!event.isPlayerTarget) return;
       this.hud?.flashDamage();
       this.audio.play('player.hurt');
+      // Haptics are reserved for what happens *to* the player. A buzz on every
+      // shot is noise; a buzz on being hit is information (M6).
+      this.haptics.impact(event.amount > 25 ? 'heavy' : 'medium');
     });
 
     sim.bus.on('loot:rejected', () => {
@@ -613,11 +635,16 @@ export class Game {
     sim.bus.on('container:opened', () => this.audio.play('container.open'));
     sim.bus.on('weapon:reloadStarted', () => this.audio.play('weapon.reload'));
     sim.bus.on('weapon:dryFire', () => this.audio.play('weapon.dryfire'));
+    sim.bus.on('weapon:jammed', () => {
+      this.audio.play('weapon.dryfire');
+      this.haptics.warn();
+    });
 
     sim.bus.on('anomaly:entered', () => this.audio.play('anomaly.enter'));
     sim.bus.on('anomaly:exited', () => this.audio.play('anomaly.exit'));
     sim.bus.on('anomaly:pulsed', (event) => {
       this.audio.play('anomaly.pulse', { x: event.x, y: event.y });
+      this.haptics.impact('heavy');
     });
     sim.bus.on('anomaly:echo', (event) => {
       this.audio.play('anomaly.echo', { x: event.x, y: event.y });
@@ -625,7 +652,10 @@ export class Game {
 
     sim.bus.on('door:opened', (event) => {
       this.audio.play('door.open', { x: event.x, y: event.y });
-      if (event.wasLocked) this.ui.toast('Schloss entriegelt.', 1400);
+      if (event.wasLocked) {
+        this.ui.toast('Schloss entriegelt.', 1400);
+        this.haptics.impact('medium');
+      }
     });
 
     // Only tell the player about a lock once per raid per door - a message that
@@ -879,23 +909,40 @@ export class Game {
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
 
+  /**
+   * Survive an interruption without losing anything.
+   *
+   * A phone can freeze or kill a backgrounded app without warning. Both the web
+   * and the native lifecycle are wired to the same handler, and everything it
+   * does is idempotent - the two sources overlap on purpose, because missing
+   * the save is far worse than doing it twice.
+   */
   private installLifecycleHooks(): void {
-    // A phone can kill a backgrounded app without warning, so save on the way
-    // out and pause the raid rather than letting it run unattended.
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'hidden') return;
-      void this.saveProfile();
-      this.audio.suspend();
-      if (this.states.current === 'raid') this.openPause();
+    bindLifecycle({
+      onSuspend: () => {
+        void this.saveProfile();
+        this.audio.suspend();
+        // A raid must never run on unattended - the player would come back dead.
+        if (this.states.current === 'raid') this.openPause();
+      },
+      onResume: () => {
+        this.audio.resume();
+      },
     });
-
-    window.addEventListener('pagehide', () => void this.saveProfile());
   }
 
   private handleResize(): void {
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.renderer.resize(width, height);
+    // The thumb sticks are sized from the viewport, not from a fixed pixel
+    // count - see docs/modules/platform-mobile.md.
+    this.touch.resize(width, height);
+
+    // Portrait is playable but wastes most of the screen, so the game asks for
+    // landscape rather than refusing to run. On a device where the orientation
+    // lock succeeded this never appears.
+    this.ui.setOrientationNotice(height > width * 1.05 && isTouchDevice());
   }
 
   /**

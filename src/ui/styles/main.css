@@ -491,8 +491,8 @@ body {
   background: rgba(18, 22, 31, 0.78);
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 0.68rem;
-  letter-spacing: 0.02em;
+  font-size: 0.64rem;
+  letter-spacing: 0;
   line-height: 1.05;
   text-transform: uppercase;
   cursor: pointer;
@@ -581,11 +581,13 @@ body {
   opacity: 0.7;
 }
 
+/* The drawn ring follows the *read* radius, which scales with the screen
+   (M6). A stick that looks bigger than it reads is worse than no stick. */
 .stick {
   position: absolute;
-  width: 180px;
-  height: 180px;
-  margin: -90px 0 0 -90px;
+  width: calc(var(--stick-radius, 90px) * 2);
+  height: calc(var(--stick-radius, 90px) * 2);
+  margin: calc(var(--stick-radius, 90px) * -1) 0 0 calc(var(--stick-radius, 90px) * -1);
   border-radius: 50%;
   border: 2px solid rgba(201, 209, 222, 0.16);
   background: rgba(201, 209, 222, 0.05);
@@ -601,9 +603,9 @@ body {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 62px;
-  height: 62px;
-  margin: -31px 0 0 -31px;
+  width: calc(var(--stick-radius, 90px) * 0.69);
+  height: calc(var(--stick-radius, 90px) * 0.69);
+  margin: calc(var(--stick-radius, 90px) * -0.345) 0 0 calc(var(--stick-radius, 90px) * -0.345);
   border-radius: 50%;
   background: rgba(201, 209, 222, 0.22);
   border: 2px solid rgba(201, 209, 222, 0.4);
@@ -780,4 +782,30 @@ button {
   .title--brand {
     font-size: 2rem;
   }
+}
+
+/* ── Portrait notice ────────────────────────────────────────────────────── */
+/*
+ * Shown only on touch devices held upright. A native build normally locks the
+ * orientation before this can appear; in a browser there is no lock worth
+ * relying on, so the game asks instead of refusing.
+ */
+.orientation-notice {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+  padding: var(--space-5);
+  background: var(--color-void);
+}
+
+.orientation-notice__icon {
+  font-size: 3rem;
+  color: var(--color-echo);
+  animation: pulse 2s ease-in-out infinite;
 }

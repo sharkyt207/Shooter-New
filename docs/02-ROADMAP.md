@@ -17,8 +17,8 @@ erst dann das nächste. Kein paralleles Anfangen von Baustellen.
 | **M3** | Gegner & KI in Tiefe | Flow-Field-Navigation, Fraktionskrieg, Squads, Wächter-Boss | ✅ abgeschlossen |
 | **M4** | Welt & Anomalien | Fragment-Generator v2, alle 5 Anomalien, Wetter/Licht | ✅ fertig |
 | **M5** | Meta: Basis, Crafting, Economy | Basisausbau, Werkbänke, Händler, Schwarzmarkt | ✅ fertig |
-| **M6** | Mobile-Härtung | Capacitor, iOS-Build, Performance-Pass, Touch-Politur | 🔜 als nächstes |
-| **M7** | Content & Art-Pass | Finale Assets, Audio, Onboarding, Lokalisierung | ⏳ geplant |
+| **M6** | Mobile-Härtung | Capacitor, Performance-Pass, Touch-Politur | 🟡 Web fertig, native Builds brauchen einen Mac |
+| **M7** | Content & Art-Pass | Finale Assets, Audio, Onboarding, Lokalisierung | 🔜 als nächstes |
 | **M8** | Live-Vorbereitung | Telemetrie, Balancing-Tools, optional PvP-Modul, Store-Release | ⏳ geplant |
 
 ---
@@ -185,17 +185,54 @@ zu sein.
 
 **Doku:** `docs/modules/base.md`, `docs/modules/economy.md`, `docs/modules/crafting.md`
 
-## M6 — Mobile-Härtung (nächster Schritt)
+## M6 — Mobile-Härtung 🟡
 
-- Capacitor-Integration, iOS-Projekt, Signierung, TestFlight
-- Performance-Pass gegen das Budget aus `01-ARCHITECTURE.md` §8
-- Texture-Atlanten, Sprite-Batching-Audit, Objekt-Pools überall
-- Touch-Politur: Deadzones, Auto-Aim-Assist-Kurven, Haptik
-- Safe-Area, Notch, unterschiedliche Seitenverhältnisse, Querformat-Lock
-- Hintergrund-/Anruf-Unterbrechung ohne Datenverlust
-- **Doku:** `docs/modules/platform-mobile.md`
+**Ziel:** Aus einem Spiel, das im Browser läuft, eine App machen, die ein
+Telefon aushält.
 
-## M7 — Content & Art-Pass
+| Feature | Umfang |
+|---------|--------|
+| Capacitor | `capacitor.config.ts`, Plugins, `cap:sync` / `cap:ios` / `cap:android` |
+| Nativer Speicher | Capacitor Preferences statt löschbarer localStorage |
+| Haptik | Nur für das, was dem Spieler passiert: Treffer, Ladehemmung, Rückstoß, Schloss, Ausgang |
+| Lebenszyklus | Web- und native Ereignisse auf dieselben idempotenten Callbacks; Raid pausiert, Profil gespeichert |
+| Querformat | Nativ gesperrt; im Browser eine Hinweisebene statt einer Weigerung |
+| Stick-Skalierung | Radius als Anteil der kurzen Bildschirmkante statt fester 90 px; der gezeichnete Ring folgt |
+| Performance-Werkzeug | `npm run measure` zählt echte WebGL-Draw-Calls; `performance.test.ts` prüft die Budgets aus §8 |
+| Smoke-Test | Zusätzlicher Durchlauf im Telefonformat 844×390 |
+
+**Was nicht gemacht werden konnte, und warum**
+
+Diese Umgebung ist Linux: kein macOS, kein Xcode, kein CocoaPods, kein
+Signierzertifikat. `npx cap add ios`, der erste Xcode-Build, Signierung und
+TestFlight stehen weiterhin aus und sind in `docs/modules/platform-mobile.md`
+als exakte Befehlsfolge hinterlegt. Ebenso jede Zahl, die von echter Hardware
+kommen muss.
+
+**Der Performance-Pass hat nichts optimiert — absichtlich**
+
+Die Vermutung war, dass einzeln erzeugte Platzhaltertexturen das Sprite-Batching
+zerreißen und ein Texture-Atlas fällig wird. Die Messung im Browser sagt **5–7
+Draw Calls bei einem Budget von 60**, die Simulation 0,13 ms bei 3,0 ms. Ein
+Atlas hätte eine Zahl verbessert, die niemanden stört. Statt einer Optimierung
+gibt es jetzt ein Messwerkzeug und einen Budget-Test, damit die Zahlen so
+bleiben.
+
+**Gefundene und behobene Fehler dieses Meilensteins**
+
+- 43 kB `@capacitor/core` lagen im Web-Bundle, nur um eine Plattform zu
+  benennen. Ersetzt durch das injizierte `window.Capacitor`; die schweren
+  Plugins liegen jetzt in Lazy-Chunks, die ein Browser nie anfordert.
+- Der Performance-Test importierte `ui` aus `game`. Der Boundary-Checker hat es
+  abgefangen — ein Test ist von der Architektur nicht ausgenommen. Die Datei
+  liegt jetzt in `app/`, der Schicht, der der Frame gehört.
+- Das Hauptmenü behauptete „Prototyp M1".
+- Quick-Use-Beschriftungen liefen im Telefonformat aus ihrem Kreis heraus.
+  Gemessen auf 844×390 statt geraten.
+
+**Doku:** `docs/modules/platform-mobile.md`
+
+## M7 — Content & Art-Pass (nächster Schritt)
 
 - Finale Assets ersetzen Platzhalter (Figma/Substance → Atlas)
 - Audio: Ambient-Layer, Materialfootsteps, Waffen, Anomalien, adaptive Musik

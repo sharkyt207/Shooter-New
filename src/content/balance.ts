@@ -419,7 +419,19 @@ export const INPUT = {
   fullThrottleAt: 0.7,
   /** Right-stick deflection above which the weapon fires automatically. */
   autoFireThreshold: 0.25,
-  /** Virtual stick radius in CSS pixels. */
+
+  /**
+   * Virtual stick radius, as a fraction of the *short* screen edge.
+   *
+   * A fixed pixel radius is wrong on a phone: 90 px is a comfortable thumb
+   * sweep on a 6-inch screen and a twitch on a tablet. Tying it to the short
+   * edge keeps the same physical gesture across devices (M6).
+   */
+  stickRadiusFraction: 0.19,
+  /** Clamp, so the stick stays sane on very small and very large screens. */
+  stickRadiusMinPx: 62,
+  stickRadiusMaxPx: 130,
+  /** Fallback before the first resize, and for headless tests. */
   stickRadiusPx: 90,
 } as const;
 

@@ -222,6 +222,12 @@ ohne eine einzige Codezeile.
 Harte Regeln: keine Allokationen in Hot-Loops (Vec2-Pooling), keine `filter/map` pro Frame in Systemen,
 Objekt-Pools für Projektile und Partikel.
 
+**Gemessen seit M6** (Desktop, Software-Rendering — Gerätezahlen stehen aus):
+Simulation 0,13 ms, View-Model 0,007 ms, 5–7 Draw Calls, ~180 Entities.
+`src/app/performance.test.ts` prüft die Budgets bei jedem Testlauf,
+`npm run measure` zählt echte WebGL-Draw-Calls im Browser. Ein Budget, das
+niemand misst, driftet.
+
 ---
 
 ## 9. Qualitätssicherung

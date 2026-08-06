@@ -266,3 +266,38 @@ von der Sekunde an, in der er eingereiht wird.
 1, ganzzahlig). Tests würfeln nicht nach einem passenden Seed, sondern setzen
 `job.failed` direkt — das ist möglich, weil das Ergebnis Daten auf dem Auftrag
 sind und keine versteckte Berechnung.
+
+---
+
+## ADR-015 — Native Fähigkeiten nur über Adapter, lazy geladen
+
+**Status:** akzeptiert (M6)
+
+**Kontext.** Capacitor macht aus dem Web-Build eine App. Der naheliegende Weg
+wäre, seine Plugins dort zu importieren, wo sie gebraucht werden — Haptik im
+HUD, Preferences im Speichersystem, Lebenszyklus in `game.ts`.
+
+**Entscheidung.** Jede native Fähigkeit bekommt eine Schnittstelle in
+`src/platform/**`, eine Web-Implementierung, eine native Implementierung und
+eine `create…()`-Funktion, die zur Laufzeit wählt. Native Plugins werden
+ausschließlich per `await import()` geladen. Kein Modul außerhalb von
+`platform/` nennt Capacitor.
+
+**Begründung.**
+
+1. **Der Browser-Build ist kein Nebenprodukt.** Er ist das, worin entwickelt,
+   getestet und gemessen wird (`npm run smoke`, `npm run measure`). Er darf für
+   native Brücken nicht bezahlen. Gemessen: der statische Import von
+   `@capacitor/core` kostete 43 kB für einen String-Vergleich — ersetzt durch das
+   injizierte `window.Capacitor`. Die Plugins liegen jetzt in Chunks von 0,3 bis
+   1,2 kB, die ein Browser nie anfordert.
+2. **Der Boundary-Checker erzwingt es ohnehin.** `game/**` darf `platform/**`
+   nicht importieren; die Regel gab es seit M0, und M6 hat sie nur eingelöst.
+3. **Adapter sind testbar, Plugins nicht.** Jede Fähigkeit hat einen Test für
+   den Fall, dass sie *fehlt* — kein Runtime, ein Runtime der wirft, eine
+   Vibration-API die es nicht gibt. Das ist der Normalfall in jedem Unit-Test
+   und in jedem Browser, und deshalb der Fall, der funktionieren muss.
+
+**Konsequenzen.** Eine native Fähigkeit ist erst benutzbar, wenn sie einen
+Adapter hat — das ist Reibung, und sie ist beabsichtigt. Wer Capacitor eines
+Tages ersetzt, tauscht Dateien in `platform/native/`, sonst nichts.

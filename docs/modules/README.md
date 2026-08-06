@@ -17,7 +17,8 @@ implementiert, getestet, optimiert **und** hier dokumentiert ist
 | [base.md](base.md) | `game/base`, `content/baseModules`, `content/quests` | 🟢 M5 fertig |
 | [economy.md](economy.md) | `game/economy`, `content/traders`, `content/contracts` | 🟢 M5 fertig |
 | [crafting.md](crafting.md) | `game/crafting` | 🟢 M5 fertig |
-| [presentation.md](presentation.md) | `render/`, `ui/`, `platform/`, `app/` | 🟢 Prototyp fertig |
+| [presentation.md](presentation.md) | `render/`, `ui/`, `app/` | 🟢 Prototyp fertig |
+| [platform-mobile.md](platform-mobile.md) | `platform/native`, `platform/input`, `platform/storage` | 🟡 M6 — Web fertig, native Builds brauchen einen Mac |
 
 ## Aufbau jeder Modul-Doku
 

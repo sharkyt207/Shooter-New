@@ -75,7 +75,7 @@ export function createMainMenuScreen(
           })
         : null,
 
-      el('div', { className: 'muted', text: `Version ${version} · Prototyp M1` }),
+      el('div', { className: 'muted', text: `Version ${version} · Meilenstein M6` }),
     ],
   });
 
